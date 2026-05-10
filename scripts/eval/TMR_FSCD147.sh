@@ -1,0 +1,26 @@
+CUDA_VISIBLE_DEVICES=0 python main.py \
+--project_name "Few-Shot Pattern Detection" \
+--datapath /home/eunchan/datasets/FSC147 \
+--logpath ./outputs/TMR_FSCD147 \
+--modeltype matching_net \
+--template_type roi_align \
+--dataset FSCD147 \
+--num_workers 1 \
+--batch_size 1 \
+--num_exemplars 1 \
+--backbone sam \
+--encoder original \
+--emb_dim 512 \
+--decoder_num_layer 1 \
+--decoder_kernel_size 3 \
+--feature_upsample \
+--positive_threshold 0.5 \
+--negative_threshold 0.5 \
+--NMS_cls_threshold 0.25 \
+--NMS_iou_threshold 0.5 \
+--fusion \
+--visualize \
+--multi_gpu \
+--nowandb \
+--eval #\
+#--refine_box
