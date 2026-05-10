@@ -12,6 +12,7 @@ from models import build_model
 from utils.TM_utils import Get_pred_boxes, GT_map, NMS
 from utils.box_refine import SAM_box_refiner
 from models.backbone.sam.sam import Sam_Backbone
+from utils.clip_utils import CLIPReranker, apply_clip_reranking
 
 def config_parser():
     parser = argparse.ArgumentParser(description="TMR Demo")
@@ -46,6 +47,17 @@ def config_parser():
     # model - head setting
     parser.add_argument("--decoder_num_layer", default=1, type=int)
     parser.add_argument("--decoder_kernel_size", default=3, type=int)
+
+    # CLIP setting
+    parser.add_argument("--use_clip", action="store_true")
+    parser.add_argument("--clip_model", type=str, default="ViT-B/32")
+    parser.add_argument("--text_prompt", type=str, default=None)
+    parser.add_argument("--negative_prompt", type=str, default=None)
+    parser.add_argument("--clip_alpha", type=float, default=1.0)
+    parser.add_argument("--clip_beta", type=float, default=0.5)
+    parser.add_argument("--clip_topk", type=int, default=100)
+    parser.add_argument("--clip_threshold", type=float, default=0.0)
+
     args = parser.parse_args()
 
     return args
@@ -60,6 +72,21 @@ class Inference(nn.Module):
 
         self.temp_sam = Sam_Backbone(requires_grad=False, model_type = "vit_h")
         self.refiner = SAM_box_refiner()
+
+        self.clip_reranker = None
+        if self.args.use_clip:
+            if self.args.text_prompt is not None:
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                self.clip_reranker = CLIPReranker(
+                    model_name=self.args.clip_model,
+                    device=device
+                )
+                print(f"CLIP reranker initialized with model: {self.args.clip_model}")
+                print(f"Positive prompt: {self.args.text_prompt}")
+                if self.args.negative_prompt:
+                    print(f"Negative prompt: {self.args.negative_prompt}")
+            else:
+                print("CLIP is enabled, but no text prompt was given.")
 
     def preprocess(self, image_input):
 
@@ -127,6 +154,22 @@ class Inference(nn.Module):
         if refine_box:
             backbone_feature = self.temp_sam(image)
             pred_logits, pred_boxes, ref_points = self.refiner(pred_logits, pred_boxes, ref_points, image, backbone_feature)
+        
+        if self.clip_reranker is not None:
+            pred_logits, pred_boxes, ref_points = apply_clip_reranking(
+                pred_logits,
+                pred_boxes,
+                ref_points,
+                image,
+                self.args.text_prompt,
+                self.clip_reranker,
+                negative_prompt=self.args.negative_prompt,
+                alpha=self.args.clip_alpha,
+                beta=self.args.clip_beta,
+                top_k=self.args.clip_topk,
+                threshold=self.args.clip_threshold
+            )
+        
         pred_logits, pred_boxes, ref_points = NMS(pred_logits, pred_boxes, ref_points, self.args.NMS_iou_threshold)
 
         return self.visualize(img_url, pred_boxes[0].cpu().numpy())
@@ -166,7 +209,7 @@ def main(args):
         with gradio.Row():
             with gradio.Column(scale=5.0):
                 image_input.render()
-                refine_box_checkbox = gradio.Checkbox(label="SAM deocder box refinement")
+                refine_box_checkbox = gradio.Checkbox(label="SAM decoder box refinement")
                 with gradio.Row(scale=2.0):
                     clearBtn = gradio.ClearButton(components=[image_input, refine_box_checkbox])
                     runBtn = gradio.Button("Run")
