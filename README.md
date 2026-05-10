@@ -1,4 +1,4 @@
-# Few-Shot Pattern Detection via Template Matching and Regression (ICCV25 Highlight)
+# Clip Based Few-Shot Pattern Detection via Template Matching and Regression (ICCV25 Highlight)
 
 **Eunchan Jo**,
 [**Dahyun Kang**](https://dahyun-kang.github.io),
@@ -22,7 +22,7 @@ Official implementation of "Few-Shot Pattern Detection via Template Matching and
 ## Overview
 
 <p align="center">
-    <img src="assets/Method_v4.jpg">
+    <img src="assets/clip_tmr_overview.jpg">
 </p>
 
 ## Installation and Data & Backbone weights Preparation
