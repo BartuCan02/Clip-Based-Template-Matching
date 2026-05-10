@@ -25,9 +25,6 @@ Official implementation of "Few-Shot Pattern Detection via Template Matching and
     <img src="assets/Method_v4.jpg">
 </p>
 
->**Abstract**: <br>
-> We address the problem of few-shot pattern detection, which aims to detect all instances of a given pattern, typically represented by a few exemplars, from an input image. Although similar problems have been studied in few-shot object counting and detection (FSCD), previous methods and their benchmarks have narrowed patterns of interest to object categories and often fail to localize non-object patterns. In this work, we propose a simple yet effective detector based on template matching and regression, dubbed TMR. While previous FSCD methods typically represent target exemplars as spatially collapsed prototypes and lose structural information, we revisit classic template matching and regression. It effectively preserves and leverages the spatial layout of exemplars through a minimalistic structure with a small number of learnable convolutional or projection layers on top of a frozen backbone. We also introduce a new dataset, dubbed RPINE, which covers a wider range of patterns than existing object-centric datasets. Our method outperforms the state-of-the-art methods on the three benchmarks, RPINE, FSCD-147, and FSCD-LVIS, and demonstrates strong generalization in cross-dataset evaluation.
-
 ## Installation and Data & Backbone weights Preparation
 #### Note: this released version was tested on Python == 3.11.9, Pytorch == 2.4.0 and cuda == 12.1.
 
@@ -41,8 +38,21 @@ You can download **FSCD-147** and **FSCD-LVIS** datasets from the [Counting-DETR
 
 You can download **RPINE** dataset form this [link](https://huggingface.co/datasets/ChipmunkG4/RPINE).
 
+```
+git clone https://huggingface.co/datasets/ChipmunkG4/RPINE
+```
+
 #### * Backbone weights preparation
 You can download SAM backbone weights from the [SAM-HQ](https://github.com/SysCV/sam-hq?tab=readme-ov-file) and [SAM](https://github.com/facebookresearch/segment-anything?tab=readme-ov-file#model-checkpoints) repositories.
+
+```
+wget -O sam_hq_vit_b.pth https://huggingface.co/lkeab/hq-sam/resolve/main/sam_hq_vit_b.pth
+
+wget -O sam_hq_vit_h.pth https://huggingface.co/lkeab/hq-sam/resolve/main/sam_hq_vit_h.pth
+
+wget -O sam_vit_h_4b8939.pth https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth
+```
+
 
 Place them in the `checkpoints` folder as shown in the 'Main Repository Structure' section below.
 
@@ -72,6 +82,10 @@ Template-Matching-And-Regression/
 ## Model weights
 
 Download the pre-trained model weights from this [link](https://huggingface.co/ChipmunkG4/TMR_weights) and place them in the `weights` folder.
+
+```
+wget -O weights/TMR_RPINE/best_model.ckpt https://huggingface.co/ChipmunkG4/TMR_weights/resolve/main/TMR_RPINE/best_model.ckpt
+```
 
 ## Demo
 
