@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# MacOS
+.DS_Store
+
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
+
+# Logs
+*.log
+
+# W&B
+wandb/
+
+# Model checkpoints
+checkpoints/
+weights/
+*.ckpt
+*.pth
+
+# Data
+data/
+
+# HuggingFace cache
+.cache/
+huggingface/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
