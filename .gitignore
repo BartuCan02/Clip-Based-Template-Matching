@@ -28,13 +28,11 @@ env/
 wandb/
 
 # Model checkpoints
-checkpoints/
-weights/
 *.ckpt
 *.pth
 
 # Data
-data/
+RPINE/
 
 # HuggingFace cache
 .cache/
