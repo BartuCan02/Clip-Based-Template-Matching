@@ -4,7 +4,7 @@ CUDA_VISIBLE_DEVICES=0 python demo.py \
 --use_clip \
 --text_prompt "arched windows" \
 --clip_model "ViT-B/32" \
---clip_alpha 1.0 \
---clip_beta 0.5 \
+--clip_alpha 0.7 \
+--clip_beta 0.3 \
 --clip_topk 100 \
 --clip_threshold 0.0

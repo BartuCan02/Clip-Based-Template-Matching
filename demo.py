@@ -7,6 +7,8 @@ import numpy as np
 from torch import nn
 from PIL import Image
 from gradio_bbox_annotator import BBoxAnnotator
+import os
+import json
 
 from models import build_model
 from utils.TM_utils import Get_pred_boxes, GT_map, NMS
@@ -87,6 +89,80 @@ class Inference(nn.Module):
                     print(f"Negative prompt: {self.args.negative_prompt}")
             else:
                 print("CLIP is enabled, but no text prompt was given.")
+    
+    def save_debug_json(self, debug_info):
+        os.makedirs("debug_logs", exist_ok=True)
+
+        with open("debug_logs/clip_debug.jsonl", "a") as f:
+            f.write(json.dumps(debug_info) + "\n")
+
+
+    def save_debug_json(self, debug_info):
+        os.makedirs("debug_logs", exist_ok=True)
+
+        with open("debug_logs/clip_debug.jsonl", "a") as f:
+            f.write(json.dumps(debug_info) + "\n")
+
+    def create_debug_info(
+        self,
+        location,
+        image,
+        pred_logits,
+        pred_boxes,
+        ref_points
+    ):
+
+        debug = {
+            "location": location,
+            "clip_enabled": self.clip_reranker is not None,
+            "text_prompt": self.args.text_prompt,
+            "negative_prompt": self.args.negative_prompt,
+        }
+
+        # BOXES
+        if len(pred_boxes) > 0 and len(pred_boxes[0]) > 0:
+
+            boxes = pred_boxes[0].detach().float().cpu()
+
+            debug["boxes"] = {
+                "shape": list(boxes.shape),
+                "first_5_boxes": boxes[:5].tolist(),
+            }
+
+        # LOGITS
+        if len(pred_logits) > 0 and len(pred_logits[0]) > 0:
+
+            logits = pred_logits[0].detach().float().cpu()
+
+            # BEFORE CLIP → pure TMR scores
+            if location == "before_clip":
+
+                debug["logits"] = {
+                    "shape": list(logits.shape),
+
+                    # only object score column
+                    "tmr_first_5_scores":
+                        logits[:5, 0].tolist()
+                }
+
+            # AFTER CLIP → fused CLIP scores
+            else:
+
+                mapped_scores = logits[:5, 0]
+
+                raw_cosine_scores = (mapped_scores * 2) - 1
+
+                debug["logits"] = {
+                    "shape": list(logits.shape),
+
+                    "fused_first_5_scores":
+                        mapped_scores.tolist(),
+
+                    "clip_raw_cosine_first_5":
+                        raw_cosine_scores.tolist()
+                }
+
+        return debug
 
     def preprocess(self, image_input):
 
@@ -109,27 +185,34 @@ class Inference(nn.Module):
         ori_image = Image.open(img_url).convert("RGB")
         img_w, img_h = ori_image.size
 
-        exemplars = np.array(exemplars, dtype=np.float32) # xyxy format
+        # Keep original RGB image for CLIP
+        clip_image = np.array(ori_image).astype(np.uint8)
 
-        # box scaling
+        exemplars = np.array(exemplars, dtype=np.float32)  # xyxy format
+
+        # box scaling for TMR
         img_res = np.array([img_w, img_h, img_w, img_h], dtype=np.float32)
         scaled_exemplars = exemplars / img_res[None, :]
         scaled_exemplars = torch.tensor(scaled_exemplars, dtype=torch.float32)
+
         if self.is_cuda:
             scaled_exemplars = scaled_exemplars.cuda()
+
         scaled_exemplars = [scaled_exemplars]
 
+        # Normalized image for TMR
         image = np.array(ori_image)
-        image = default_transform(1024)(image = image)['image'].unsqueeze(0)
+        image = default_transform(1024)(image=image)['image'].unsqueeze(0)
+
         if self.is_cuda:
             image = image.cuda()
 
-        return img_url, image, scaled_exemplars
-
+        return img_url, image, scaled_exemplars, clip_image
+    
     @torch.no_grad()
     def infer(self, image_input, refine_box,*args, **kwargs):
 
-        img_url, image, exemplars = self.preprocess(image_input)
+        img_url, image, exemplars, clip_image = self.preprocess(image_input)
         exemplars = [[exemplars.unsqueeze(0)] for exemplars in exemplars[0]]
 
         pred_logits = []
@@ -155,12 +238,23 @@ class Inference(nn.Module):
             backbone_feature = self.temp_sam(image)
             pred_logits, pred_boxes, ref_points = self.refiner(pred_logits, pred_boxes, ref_points, image, backbone_feature)
         
+
+        before_clip_debug = self.create_debug_info(
+            location="before_clip",
+            image=image,
+            pred_logits=pred_logits,
+            pred_boxes=pred_boxes,
+            ref_points=ref_points
+        )
+
+        self.save_debug_json(before_clip_debug)
+
         if self.clip_reranker is not None:
             pred_logits, pred_boxes, ref_points = apply_clip_reranking(
                 pred_logits,
                 pred_boxes,
                 ref_points,
-                image,
+                clip_image,
                 self.args.text_prompt,
                 self.clip_reranker,
                 negative_prompt=self.args.negative_prompt,
@@ -169,7 +263,36 @@ class Inference(nn.Module):
                 top_k=self.args.clip_topk,
                 threshold=self.args.clip_threshold
             )
+            
+        after_clip_debug = self.create_debug_info(
+                location="after_clip",
+                image=image,
+                pred_logits=pred_logits,
+                pred_boxes=pred_boxes,
+                ref_points=ref_points
+            )
+
+        self.save_debug_json(after_clip_debug)
         
+        # Final thresholding applied to the fused pred_logits and pred_boxed(so to beta * clip + alpha * tmr scores)
+        final_score_threshold = 0.9
+
+        filtered_logits = []
+        filtered_boxes = []
+        filtered_ref_points = []
+
+        for logits, boxes, refs in zip(pred_logits, pred_boxes, ref_points):
+            scores = logits[:, 0] if logits.dim() > 1 else logits
+            keep = scores >= final_score_threshold
+
+            filtered_logits.append(logits[keep])
+            filtered_boxes.append(boxes[keep])
+            filtered_ref_points.append(refs[keep])
+
+        pred_logits = filtered_logits
+        pred_boxes = filtered_boxes
+        ref_points = filtered_ref_points
+            
         pred_logits, pred_boxes, ref_points = NMS(pred_logits, pred_boxes, ref_points, self.args.NMS_iou_threshold)
 
         return self.visualize(img_url, pred_boxes[0].cpu().numpy())
