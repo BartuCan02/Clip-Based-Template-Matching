@@ -90,12 +90,6 @@ class Inference(nn.Module):
             else:
                 print("CLIP is enabled, but no text prompt was given.")
     
-    def save_debug_json(self, debug_info):
-        os.makedirs("debug_logs", exist_ok=True)
-
-        with open("debug_logs/clip_debug.jsonl", "a") as f:
-            f.write(json.dumps(debug_info) + "\n")
-
 
     def save_debug_json(self, debug_info):
         os.makedirs("debug_logs", exist_ok=True)
@@ -117,6 +111,8 @@ class Inference(nn.Module):
             "clip_enabled": self.clip_reranker is not None,
             "text_prompt": self.args.text_prompt,
             "negative_prompt": self.args.negative_prompt,
+            "alpha value" : self.args.clip_alpha,
+            "beta value" : self.args.beta_alpha
         }
 
         # BOXES
@@ -275,7 +271,7 @@ class Inference(nn.Module):
         self.save_debug_json(after_clip_debug)
         
         # Final thresholding applied to the fused pred_logits and pred_boxed(so to beta * clip + alpha * tmr scores)
-        final_score_threshold = 0.9
+        final_score_threshold = 0.5
 
         filtered_logits = []
         filtered_boxes = []
