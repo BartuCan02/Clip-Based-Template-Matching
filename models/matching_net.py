@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from .template_matching import TemplateMatching
 from .regression_head import Decoder_model, ObjectnessHead, BboxesHead
 from .encoders import build_encoder
+from utils.clip_heatmap import CLIPHeatmap
 
 class matching_net(nn.Module):
     def __init__(self, backbone, args):
@@ -41,41 +42,132 @@ class matching_net(nn.Module):
         self.objectness_head = ObjectnessHead(self.decoder_o.out_channels)
         self.ltrbs_head = BboxesHead(self.decoder_b.out_channels) if self.box_reg else None
 
-    def forward(self, sample, exemplars, **kwargs):
+def forward(self, sample, exemplars, **kwargs):
+    """
+    Forward pass of TMR.
 
-        f = self.encoder(sample)
-        if not isinstance(f, list):
-            f = [f]
+    sample:
+        Input image tensor.
+        Shape: [B, 3, 1024, 1024]
 
-        if self.feature_upsample:
-            f = [F.interpolate(f_, scale_factor=2, mode='bilinear', align_corners=False) for f_ in f]       
+    exemplars:
+        Support exemplar boxes.
+    """
 
-        os, bs, f_TMs = [], [], []
-        for i in range(len(f)):
-            
-            fp = self.input_proj[i](f[i])
+    # 1. Extract backbone feature map from the input image.
+    # f: [B, 256, 64, 64]
+    f = self.encoder(sample)
 
-            if self.matcher is None:
-                f_TM = fp
-            else:
-                f_TM = self.matcher(fp, exemplars)
+    # The code supports both single-scale and multi-scale features.
+    # If the encoder returns only one tensor, wrap it into a list.
+    # After this:
+    # f = [feature_level_0]
+    # f[0]: [B, 256, 64, 64]
+    if not isinstance(f, list):
+        f = [f]
 
-            if self.fusion:
-                f_cat = torch.cat([fp, f_TM], dim=1)
-            else:
-                f_cat = f_TM
+    # 2. Upsample feature maps spatially.
+    # The paper upsamples SAM features from 64x64 to 128x128
+    # to get denser predictions.
+    # f[0]: [B, 256, 128, 128]
+    if self.feature_upsample:
+        f = [
+            F.interpolate(
+                f_,
+                scale_factor=2,
+                mode='bilinear',
+                align_corners=False
+            )
+            for f_ in f
+        ]
 
-            if self.box_reg:
-                f_box = self.decoder_b(f_cat)
-                b = self.ltrbs_head(f_box)
-            else:
-                b = None
+    # Output lists for each feature level.
+    # os:
+    #   objectness / presence maps
+    #   [B, 1, H, W]
+    # bs:
+    #   box regression maps
+    #   [B, 4, H, W]
+    # f_TMs:
+    #   template matching feature maps for debugging/visualization
+    #   [B, emb_dim, H, W]
+    
+    os, bs, f_TMs = [], [], []
 
-            f_obj = self.decoder_o(f_cat)
-            o = self.objectness_head(f_obj)
+    # 3. Loop over feature levels.
+    for i in range(len(f)):
 
-            os.append(o)
-            bs.append(b)
-            f_TMs.append(F.relu(f_TM))
+        # 4. Project backbone features to embedding dimension.
+        # input_proj is a 1x1 Conv2d.
+        # With emb_dim=512:
+        # fp: [B, 512, 128, 128]
+        # This is the projected image feature F.
+        fp = self.input_proj[i](f[i])
 
-        return os, bs, f_TMs, f[0]
+        # 5. Compute template matching feature.
+        # f_TM: [B, 512, H, W]
+        if self.matcher is None:
+            f_TM = fp
+        else:
+            f_TM = self.matcher(fp, exemplars)
+
+        # 6. Fuse original image feature and template matching feature.
+        # fp:   [B, 512, H, W]
+        # f_TM: [B, 512, H, W]
+        # f_cat:
+        # [B, 1024, H, W]
+
+        # ToDo for CLIP heatmap:
+        # If clip_heatmap has shape [B, 1, H, W],
+        # then:
+        # f_cat = torch.cat([fp, f_TM, clip_heatmap], dim=1)
+        # would become [B, 1025, H, W].
+        
+        if self.fusion:
+            f_cat = torch.cat([fp, f_TM], dim=1)
+        else:
+            f_cat = f_TM
+
+        # 7. Box regression branch.
+        # b: [B, 4, H, W]
+        if self.box_reg:
+            f_box = self.decoder_b(f_cat)
+            b = self.ltrbs_head(f_box)
+        else:
+            b = None
+
+        # 8. Objectness / presence branch.
+        # o: [B, 1, H, W]
+        f_obj = self.decoder_o(f_cat)
+        o = self.objectness_head(f_obj)
+
+        os.append(o)
+        bs.append(b)
+
+        # Store template matching feature for visualization/debugging.
+        # ReLU removes negative values.
+        #
+        # f_TM:
+        # [B, 512, H, W]
+        f_TMs.append(F.relu(f_TM))
+
+    # Return:
+    #
+    # os:
+    #   list of objectness maps
+    #   usually one element: [[B, 1, H, W]]
+    #
+    # bs:
+    #   list of box regression maps
+    #   usually one element: [[B, 4, H, W]]
+    #
+    # f_TMs:
+    #   list of template matching feature maps
+    #   usually one element: [[B, 512, H, W]]
+    #
+    # f[0]:
+    #   original encoder feature after optional upsampling,
+    #   before input projection.
+    #   Example: [B, 256, 128, 128]
+
+    return os, bs, f_TMs, f[0]
