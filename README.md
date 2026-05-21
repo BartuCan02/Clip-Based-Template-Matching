@@ -95,6 +95,10 @@ python demo.py --ckpt ./weights/TMR_FSCD147/best_model.ckpt
 
 ## NaCLIP Heatmap Demo
 
+<p align="center">
+    <img src="assets/new_clip_tmr_overview.png">
+</p>
+
 Visualise NaCLIP patch-level similarity for any image and text prompt — no model weights required.
 
 **Install minimal dependencies** (Python 3.11 recommended; tested with PyTorch 2.4.0):
