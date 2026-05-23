@@ -19,7 +19,6 @@ import torch
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-import numpy as np
 from PIL import Image
 
 import clip as openai_clip
@@ -57,15 +56,17 @@ PROMPT_TEMPLATES = [
 
 
 def encode_text_ensemble(clip_model, class_name: str, device) -> torch.Tensor:
+    # Faster vectorized version
     feats = []
-    for template in PROMPT_TEMPLATES:
-        tokens = openai_clip.tokenize([template.format(class_name)]).to(device)
-        with torch.no_grad():
-            f = clip_model.encode_text(tokens).float()
-            feats.append(F.normalize(f, dim=-1))
-    mean = torch.stack(feats).mean(dim=0)
-    return F.normalize(mean, dim=-1)
+    texts = [template.format(class_name) for template in PROMPT_TEMPLATES]
+    tokens = openai_clip.tokenize(texts).to(device)
 
+    with torch.inference_mode():
+        feats = clip_model.encode_text(tokens).float()
+        feats = F.normalize(feats, dim=-1)
+
+    mean = feats.mean(dim=0, keepdim=True)
+    return F.normalize(mean, dim=-1)
 
 def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -108,16 +109,20 @@ def main(args):
 
     im2 = axes[1].imshow(prob14, cmap="jet", vmin=0, vmax=1)
     axes[1].set_title("Patch probs (14×14)")
-    for r in range(14):
-        for c in range(14):
+    for r in range(H):
+        for c in range(W):
             axes[1].text(c, r, f"{prob14[r, c]:.2f}", ha="center", va="center", fontsize=4, color="white")
     plt.colorbar(im2, ax=axes[1], fraction=0.046)
 
     axes[2].imshow(img224)
     axes[2].imshow(prob224, cmap="jet", alpha=0.55, vmin=0, vmax=1)
-    for i in range(1, 14):
-        axes[2].axhline(i * 16, color="white", linewidth=0.4, alpha=0.6)
-        axes[2].axvline(i * 16, color="white", linewidth=0.4, alpha=0.6)
+    patch_size = 224 // H
+
+    for i in range(1, H):
+        axes[2].axhline(i * patch_size, color="white", linewidth=0.4, alpha=0.6)
+
+    for i in range(1, W):
+        axes[2].axvline(i * patch_size, color="white", linewidth=0.4, alpha=0.6)
     axes[2].set_title("Overlay + patch grid")
     axes[2].axis("off")
 
