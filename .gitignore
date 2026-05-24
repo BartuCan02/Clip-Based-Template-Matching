@@ -50,3 +50,6 @@ __pycache__/
 
 # Naclip
 utils/NACLIP
+
+# Datasets search
+datasets/
