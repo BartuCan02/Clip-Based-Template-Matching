@@ -5,15 +5,7 @@ import clip
 from prompts.imagenet_template import openai_imagenet_template
 
 class NACLIPHeatmap:
-    def __init__(
-        self,
-        clip_path="ViT-B/16",
-        device="cuda",
-        arch="reduced",
-        attn_strategy="naclip",
-        gaussian_std=5.0,
-        logit_scale=40,
-    ):
+    def __init__(self,clip_path="ViT-B/16",device="cuda",arch="reduced",attn_strategy="naclip",gaussian_std=5.0,logit_scale=40,):
         self.device = device
         self.net, self.preprocess = clip.load(
             clip_path,
@@ -47,6 +39,7 @@ class NACLIPHeatmap:
 
             query_features.append(feat.unsqueeze(0))
 
+        # Dimension is [num_classed, D]
         query_features = torch.cat(query_features, dim=0)
         return query_features
 
@@ -87,14 +80,15 @@ class NACLIPHeatmap:
         logits = self.forward_logits(img, class_names)
 
         probs = torch.softmax(logits * self.logit_scale, dim=1)
-        heat = probs[:, target_idx:target_idx + 1]
+        naclip_heat_map = probs[:, target_idx:target_idx + 1]
 
         if out_size is not None:    #upsampling
-            heat = F.interpolate(
-                heat,
+            naclip_heat_map = F.interpolate(
+                naclip_heat_map,
                 size=out_size,
                 mode="bilinear",
                 align_corners=False,
             )
 
-        return heat
+        # heat[B, 1, H, W]
+        return naclip_heat_map

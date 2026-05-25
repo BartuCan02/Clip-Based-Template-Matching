@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from .template_matching import TemplateMatching
 from .regression_head import Decoder_model, ObjectnessHead, BboxesHead
 from .encoders import build_encoder
+from .naclip_wrapper import NaclipHeatmap
 
 # Concatenates naclip heatmapper with the tmr's feature map and tmr's heatmap
 
@@ -138,11 +139,8 @@ class matching_net(nn.Module):
             if naclip_heatmap is not None:
                 naclip_heatmap = naclip_heatmap.to(f_cat.device)
                 
-                # Makes sure correct dim (ToDo: If this line is unncessary remove it aftet the dataset test) 
-                if naclip_heatmap.dim() == 3:
-                    naclip_heatmap = naclip_heatmap.unsqueeze(1)
                 
-                # Makes sure correct dim (ToDo: If this line is unncessary remove it aftet the dataset test) 
+                # Ensures the heatmap spatial resolution matches f_cat. (ToDo: If this line is unncessary remove it aftet the dataset test) 
                 if naclip_heatmap.shape[-2:] != f_cat.shape[-2:]:
                     naclip_heatmap = F.interpolate(
                         naclip_heatmap,
@@ -150,7 +148,6 @@ class matching_net(nn.Module):
                         mode="bilinear",
                         align_corners=False
                     )
-
                 # f_cat:
                 # [B, 1025, H, W]
                 f_cat = torch.cat([f_cat, naclip_heatmap], dim=1)
