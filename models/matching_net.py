@@ -130,8 +130,11 @@ class matching_net(nn.Module):
                 f_cat = torch.cat([fp, f_TM], dim=1)
             else:
                 f_cat = f_TM
-
-            # 7. Fuse the naclip heatmap to f_cat = [f_TM, fp, naclip_heatmap]
+            
+            # 7. Concatenate the NaCLIP heatmap to f_cat.
+            # If fusion=True:  f_cat = [fp, f_TM, naclip_heatmap]
+            # If fusion=False: f_cat = [f_TM, naclip_heatmap]
+            
             if naclip_heatmap is not None:
                 naclip_heatmap = naclip_heatmap.to(f_cat.device)
                 
