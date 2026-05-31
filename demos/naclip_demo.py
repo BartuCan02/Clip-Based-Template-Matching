@@ -76,7 +76,6 @@ def main(args):
     clip_model.eval()
 
     text_emb = encode_text_ensemble(clip_model, args.text, device)       # [1, 512]
-    bg_emb   = encode_text_ensemble(clip_model, args.background, device) # [1, 512]
 
     pil = Image.open(args.image).convert("RGB")
     x   = backbone.clip_preprocess(pil).unsqueeze(0).to(device)
@@ -88,20 +87,17 @@ def main(args):
         pf = patch_feats.flatten(2).permute(0, 2, 1)   # [1, 196, 512]
         pf = F.normalize(pf, dim=-1)
 
-        # Two-class softmax: [background, target]
-        class_embs = torch.cat([bg_emb, text_emb], dim=0)  # [2, 512]
-        logits = pf @ class_embs.T                          # [1, 196, 2]
-        logits = logits.permute(0, 2, 1).reshape(1, 2, H, W)
-        probs  = torch.softmax(logits * args.logit_scale, dim=1)
+        # Raw cosine similarity between each patch and the text embedding
+        sim = (pf @ text_emb.T).reshape(1, 1, H, W)    # [1, 1, 14, 14]
 
-        prob14  = probs[0, 1].cpu().numpy()             # [14, 14]
+        prob14  = sim[0, 0].cpu().numpy()               # [14, 14]
         prob224 = F.interpolate(
-            probs[:, 1:2], size=(224, 224), mode="bilinear", align_corners=False,
+            sim, size=(224, 224), mode="bilinear", align_corners=False,
         ).squeeze().cpu().numpy()
 
     img224 = pil.resize((224, 224))
     fig, axes = plt.subplots(1, 4, figsize=(18, 4))
-    fig.suptitle(f'Prompt: "{args.text}" vs "{args.background}"  |  logit_scale={args.logit_scale}', fontsize=13)
+    fig.suptitle(f'Prompt: "{args.text}"  |  raw cosine similarity', fontsize=13)
 
     axes[0].imshow(img224)
     axes[0].set_title("Input image")
@@ -152,7 +148,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--image",       required=True,         help="Path to input image")
     parser.add_argument("--text",        required=True,         help="Target class name")
-    parser.add_argument("--background",  default="background",  help="Background class name")
     parser.add_argument("--logit_scale", type=float, default=40, help="Softmax temperature scale")
     parser.add_argument("--save",        default="",            help="Optional path to save the figure")
     main(parser.parse_args())
