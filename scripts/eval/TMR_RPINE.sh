@@ -1,6 +1,6 @@
 CUDA_VISIBLE_DEVICES=0 python main.py \
 --project_name "Few-Shot Pattern Detection" \
---datapath /Users/bartu/Desktop/Bartu/RCI/4.Semester/NLP-Project/Template-Matching-and-Regression/data/RPINE_hf \
+--datapath /home/zhox/Clip-Based-Template-Matching/data/RPINE \
 --logpath ./weights/TMR_RPINE \
 --modeltype matching_net \
 --template_type roi_align \

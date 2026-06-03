@@ -54,3 +54,6 @@ utils/NACLIP
 # Dataset search and analysis 
 sku/
 datasets/
+
+# Weights
+weights/TMR_RPINE
