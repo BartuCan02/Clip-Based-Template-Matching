@@ -18,7 +18,7 @@ def config_parser():
     parser.add_argument('--seed', default=42, type=int)
 
     # log setting (wandb)
-    parser.add_argument('--project_name', type=str, default="Few-Shot Pattern Detection", help='Name of project (for wandb)')
+    parser.add_argument('--project_name', type=str, default="RPINE-TMR", help='Name of project (for wandb)')
     parser.add_argument("--logpath", type=str, default="./outputs/default", help="/Path/to/output/logs/and/checkpoints")
     parser.add_argument('--nowandb', action='store_true', help='Flag not to use wandb')
     parser.add_argument("--AP_term", default=5, type=int, help='If this value is N, AP is calculated every N epochs')
@@ -79,11 +79,14 @@ def config_parser():
     parser.add_argument("--decoder_num_layer", default=1, type=int)
     parser.add_argument("--decoder_kernel_size", default=3, type=int)
 
-    # CLIP semantic reranking setting
-    parser.add_argument('--use_clip', action='store_true', help='Flag to enable CLIP semantic reranking (eval only)')
+    # NACLIP setting
+    parser.add_argument('--use_naclip_heatmap', action='store_true',help='Use NaCLIP heatmap fusion')
     parser.add_argument('--clip_model', type=str, default="ViT-B/32", help='CLIP model variant (e.g., ViT-B/32, ViT-L/14)')
     parser.add_argument('--text_prompt', type=str, default=None, help='Positive text prompt for CLIP semantic reranking')
     parser.add_argument('--negative_prompt', type=str, default=None, help='Optional negative text prompt for CLIP semantic reranking')
+
+    # CLIP semantic reranking setting
+    parser.add_argument('--use_clip', action='store_true', help='Flag to enable CLIP semantic reranking (eval only)')
     parser.add_argument('--clip_alpha', type=float, default=0.7, help='Weight for TMR confidence in score fusion (default 0.7)')
     parser.add_argument('--clip_beta', type=float, default=0.3, help='Weight for CLIP semantic score in fusion (default 0.3)')
     parser.add_argument('--clip_topk', type=int, default=100, help='Only apply CLIP to top-k TMR predictions for efficiency')
@@ -120,7 +123,7 @@ def main(args):
         accelerator="auto",
         strategy="ddp" if args.multi_gpu else "auto",
         devices=-1 if args.multi_gpu else 1 if torch.cuda.is_available() else torch.cpu.device_count(),
-        logger=CSVLogger(save_dir=args.logpath) if args.nowandb else WandbLogger(name=run_name, save_dir=args.logpath, project=project_name),
+        logger=CSVLogger(save_dir=args.logpath) if args.nowandb else WandbLogger(name=run_name,entity="nlp-project-tum", save_dir=args.logpath, project=project_name),
         callbacks=callbacks,
         num_sanity_val_steps=0,
         gradient_clip_val=args.clip_max_norm,

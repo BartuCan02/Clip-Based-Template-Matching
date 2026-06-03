@@ -1,7 +1,7 @@
 CUDA_VISIBLE_DEVICES=0 python main.py \
---project_name "Few-Shot Pattern Detection" \
---datapath /Users/bartu/Desktop/Bartu/RCI/4.Semester/NLP-Project/Template-Matching-and-Regression/data/RPINE_hf \
---logpath ./weights/TMR_RPINE \
+--project_name "RPINE-CLIP-TMR" \
+--datapath /home/zhox/Clip-Based-Template-Matching/data/RPINE \
+--logpath ./weights/TMR_RPINE_baseline \  # weights/your_run
 --modeltype matching_net \
 --template_type roi_align \
 --dataset RPINE \
@@ -20,8 +20,8 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
 --NMS_iou_threshold 0.5 \
 --fusion \
 --visualize \
---nowandb \
 --eval 
+#--nowandb \
 #--multi_gpu \
 #--refine_box
 
