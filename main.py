@@ -82,6 +82,8 @@ def config_parser():
     # NACLIP setting
     parser.add_argument('--use_naclip_heatmap', action='store_true',help='Use NaCLIP heatmap fusion')
     parser.add_argument('--clip_model', type=str, default="ViT-B/32", help='CLIP model variant (e.g., ViT-B/32, ViT-L/14)')
+    parser.add_argument("--naclip_logit_scale", type=float, default=40.0)
+    parser.add_argument("--naclip_gaussian_std", type=float, default=5.0)
     parser.add_argument('--text_prompt', type=str, default=None, help='Positive text prompt for CLIP semantic reranking')
     parser.add_argument('--negative_prompt', type=str, default=None, help='Optional negative text prompt for CLIP semantic reranking')
 

@@ -12,7 +12,7 @@ from criterion import build_criterion
 from utils.TM_utils import Get_pred_boxes, GT_map, NMS
 from utils.box_refine import SAM_box_refiner
 from utils.log_utils import image_info_collector, Get_AP_scores, coco_style_annotation_generator, del_img_log_path, Get_MAE_RMSE
-from utils.clip_utils import CLIPReranker, apply_clip_reranking
+from models.naclip_wrapper import NACLIPHeatmap
 
 class Matching_Trainer(LightningModule):
     def __init__(self, args, datamodule):
@@ -45,24 +45,18 @@ class Matching_Trainer(LightningModule):
             else:
                 raise ValueError("SAM decoder box refinement is only available in evaluation mode.")
 
-        # CLIP initialization
-        self.clip_reranker = None
-        if self.args.use_clip:
-            if self.args.eval and self.args.text_prompt is not None:
-                try:
-                    device = "cuda" if torch.cuda.is_available() else "cpu"
-                    self.clip_reranker = CLIPReranker(model_name=self.args.clip_model, device=device)
-                    print(f"CLIP reranker initialized with model: {self.args.clip_model}")
-                    print(f"Positive prompt: '{self.args.text_prompt}'")
-                    if self.args.negative_prompt:
-                        print(f"Negative prompt: '{self.args.negative_prompt}'")
-                except Exception as e:
-                    print(f"Failed to initialize CLIP reranker: {e}")
-                    self.clip_reranker = None
-            elif not self.args.eval:
-                print("CLIP reranking is only available in evaluation mode.")
-            elif self.args.text_prompt is None:
-                print("Text prompt is required for CLIP reranking. Use --text_prompt argument.")
+
+        self.naclip = None
+        if self.args.use_naclip_heatmap:
+            self.naclip = NACLIPHeatmap(
+                clip_path="ViT-B/16",
+                device=device,
+                arch="reduced",
+                attn_strategy="naclip",
+                gaussian_std=5.0,
+                logit_scale=40,
+            )
+
 
     def training_step(self, batch, batch_idx):
         return self.each_step(batch, 'train')
@@ -137,190 +131,11 @@ class Matching_Trainer(LightningModule):
             backbone_feature = self.temp_sam(image)
             pred_logits, pred_boxes, ref_points = self.refiner(pred_logits, pred_boxes, ref_points, image, backbone_feature)
         
-        # Apply CLIP reranking before NMS
-        if self.clip_reranker is not None and stage in ['val', 'test']:
-            pred_logits, pred_boxes, ref_points = apply_clip_reranking(
-                pred_logits, pred_boxes, ref_points, image,
-                self.args.text_prompt, self.clip_reranker,
-                negative_prompt=self.args.negative_prompt,
-                alpha=self.args.clip_alpha,
-                beta=self.args.clip_beta,
-                top_k=self.args.clip_topk,
-                threshold=self.args.clip_threshold
-            )
         
         pred_logits, pred_boxes, ref_points = NMS(pred_logits, pred_boxes, ref_points, self.args.NMS_iou_threshold)
         image_info_collector(self.args.logpath, stage, batch, pred_logits, pred_boxes, ref_points)
 
         return {'loss': sum(losses['loss'])}
-    
-    def _tensor_debug_info(self, x, name, max_items=5):
-        """
-        Convert tensor/list/object info into JSON-serializable debug info.
-        """
-        info = {
-            "name": name,
-            "type": str(type(x))
-        }
-
-        if isinstance(x, torch.Tensor):
-            x_detached = x.detach()
-            info["shape"] = list(x_detached.shape)
-            info["dtype"] = str(x_detached.dtype)
-            info["device"] = str(x_detached.device)
-
-            if x_detached.numel() > 0:
-                x_cpu = x_detached.float().cpu()
-                info["min"] = float(x_cpu.min().item())
-                info["max"] = float(x_cpu.max().item())
-                info["mean"] = float(x_cpu.mean().item())
-                info["first_values"] = x_cpu.flatten()[:max_items].tolist()
-            else:
-                info["empty"] = True
-
-        elif isinstance(x, list):
-            info["length"] = len(x)
-            if len(x) > 0:
-                info["first_element"] = self._tensor_debug_info(x[0], name + "[0]", max_items=max_items)
-
-        else:
-            info["value"] = str(x)
-
-        return info
-
-
-    def _prediction_debug_info(self, pred_logits, pred_boxes, ref_points, image, batch, stage, location):
-        """
-        Collects assumptions we need to verify for CLIP reranking.
-        """
-        debug = {
-            "stage": stage,
-            "location": location,
-            "global_step": int(self.trainer.global_step) if hasattr(self, "trainer") else None,
-            "current_epoch": int(self.trainer.current_epoch) if hasattr(self, "trainer") else None,
-            "clip_enabled": self.clip_reranker is not None,
-            "text_prompt": getattr(self.args, "text_prompt", None),
-            "negative_prompt": getattr(self.args, "negative_prompt", None),
-            "clip_alpha": float(getattr(self.args, "clip_alpha", -1)),
-            "clip_beta": float(getattr(self.args, "clip_beta", -1)),
-            "clip_topk": int(getattr(self.args, "clip_topk", -1)),
-            "clip_threshold": float(getattr(self.args, "clip_threshold", -1)),
-            "nms_cls_threshold": float(getattr(self.args, "NMS_cls_threshold", -1)),
-            "nms_iou_threshold": float(getattr(self.args, "NMS_iou_threshold", -1)),
-        }
-
-        # Image info
-        debug["image"] = self._tensor_debug_info(image, "image")
-
-        if isinstance(image, torch.Tensor):
-            if image.dim() == 4:
-                debug["batch_size"] = int(image.shape[0])
-                debug["image_format_guess"] = "BCHW"
-                debug["image_height"] = int(image.shape[2])
-                debug["image_width"] = int(image.shape[3])
-            elif image.dim() == 3:
-                debug["batch_size"] = 1
-                debug["image_format_guess"] = "CHW_or_HWC"
-                if image.shape[0] == 3:
-                    debug["image_height"] = int(image.shape[1])
-                    debug["image_width"] = int(image.shape[2])
-                else:
-                    debug["image_height"] = int(image.shape[0])
-                    debug["image_width"] = int(image.shape[1])
-
-        # Batch metadata if available
-        debug["batch_keys"] = list(batch.keys())
-
-        for possible_key in ["img_name", "img_names", "image_name", "image_names", "name", "names"]:
-            if possible_key in batch:
-                try:
-                    debug[possible_key] = str(batch[possible_key])
-                except Exception:
-                    debug[possible_key] = "could_not_convert_to_string"
-
-        # Prediction list/tensor info
-        debug["pred_logits"] = self._tensor_debug_info(pred_logits, "pred_logits")
-        debug["pred_boxes"] = self._tensor_debug_info(pred_boxes, "pred_boxes")
-        debug["ref_points"] = self._tensor_debug_info(ref_points, "ref_points")
-
-        # Detailed first batch item checks
-        if isinstance(pred_boxes, list) and len(pred_boxes) > 0 and isinstance(pred_boxes[0], torch.Tensor):
-            boxes = pred_boxes[0].detach().float().cpu()
-            debug["num_boxes_first_item"] = int(len(boxes))
-
-            if len(boxes) > 0:
-                debug["first_10_boxes"] = boxes[:10].tolist()
-                debug["boxes_min"] = float(boxes.min().item())
-                debug["boxes_max"] = float(boxes.max().item())
-
-                # Box scale assumption
-                debug["boxes_look_normalized"] = bool(boxes.max().item() <= 1.5)
-                debug["boxes_look_pixel_coordinates"] = bool(boxes.max().item() > 1.5)
-
-                # xyxy assumption
-                if boxes.dim() == 2 and boxes.shape[1] == 4:
-                    x2_gt_x1 = (boxes[:, 2] > boxes[:, 0]).float().mean().item()
-                    y2_gt_y1 = (boxes[:, 3] > boxes[:, 1]).float().mean().item()
-
-                    debug["xyxy_check"] = {
-                        "x2_greater_than_x1_ratio": float(x2_gt_x1),
-                        "y2_greater_than_y1_ratio": float(y2_gt_y1),
-                        "likely_xyxy": bool(x2_gt_x1 > 0.95 and y2_gt_y1 > 0.95)
-                    }
-
-                    widths = boxes[:, 2] - boxes[:, 0]
-                    heights = boxes[:, 3] - boxes[:, 1]
-
-                    debug["box_widths"] = {
-                        "min": float(widths.min().item()),
-                        "max": float(widths.max().item()),
-                        "mean": float(widths.mean().item())
-                    }
-                    debug["box_heights"] = {
-                        "min": float(heights.min().item()),
-                        "max": float(heights.max().item()),
-                        "mean": float(heights.mean().item())
-                    }
-
-        if isinstance(pred_logits, list) and len(pred_logits) > 0 and isinstance(pred_logits[0], torch.Tensor):
-            logits = pred_logits[0].detach().float().cpu()
-            debug["num_logits_first_item"] = int(len(logits))
-
-            if logits.numel() > 0:
-                debug["first_10_logits"] = logits[:10].tolist()
-                debug["logits_min"] = float(logits.min().item())
-                debug["logits_max"] = float(logits.max().item())
-
-                # Probability/logit assumption
-                debug["logits_look_like_probabilities"] = bool(logits.min().item() >= 0.0 and logits.max().item() <= 1.0)
-                debug["logits_look_like_raw_logits"] = bool(logits.min().item() < 0.0 or logits.max().item() > 1.0)
-
-                if logits.dim() == 2:
-                    debug["logit_columns"] = int(logits.shape[1])
-                    debug["first_column_minmax"] = [
-                        float(logits[:, 0].min().item()),
-                        float(logits[:, 0].max().item())
-                    ]
-                    if logits.shape[1] > 1:
-                        debug["second_column_minmax"] = [
-                            float(logits[:, 1].min().item()),
-                            float(logits[:, 1].max().item())
-                        ]
-
-        return debug
-
-
-    def _write_clip_debug_json(self, debug_info):
-        """
-        Append one JSON object per line.
-        """
-        os.makedirs(self.args.logpath, exist_ok=True)
-        debug_path = os.path.join(self.args.logpath, "clip_debug.jsonl")
-
-        with open(debug_path, "a") as f:
-            f.write(json.dumps(debug_info) + "\n")
-
-
 
 
     def each_step(self, batch, stage):
@@ -336,6 +151,17 @@ class Matching_Trainer(LightningModule):
         # These define WHAT pattern/object TMR should search for
         exemplars = batch["exemplars"]
 
+        
+        # Labels of bounding boxes
+        label = batch["label"][0]
+        class_names = ["background", label]
+
+        naclip_heatmap = self.naclip.target_heatmap(
+            image,
+            class_names=class_names,
+            target_idx=1,
+            out_size=None
+        )
 
         # Ablation settings for different regression experiments
         # a: disable learned box regression completely
@@ -364,7 +190,7 @@ class Matching_Trainer(LightningModule):
         #
         # _:
 
-        pred_objectness, pred_regressions, matching_feature, _ = self.model(image, exemplars)
+        pred_objectness, pred_regressions, matching_feature, _ = self.model(image,exemplars,naclip_heatmap=naclip_heatmap)
 
         # Convert predictions + GT boxes into loss-compatible format
         #
@@ -383,7 +209,6 @@ class Matching_Trainer(LightningModule):
             exemplars,
             batch
         )
-
 
         # Compute TMR losses
         #
@@ -448,71 +273,6 @@ class Matching_Trainer(LightningModule):
                     backbone_feature
                 )
 
-            # CLIP semantic reranking step (my addition)
-            # TMR already proposed candidate boxes
-            # For each predicted box:
-            #   1. Crop predicted image region
-            #   2. Encode crop using CLIP image encoder
-            #   3. Encode text prompt using CLIP text encoder
-            #   4. Compute image-text similarity
-            #   5. Modify/rerank TMR confidence scores
-            #
-            # Conceptually:
-            #
-            # final_score =
-            #     alpha * TMR_score
-            #   + beta  * CLIP_similarity
-            #
-
-            # top_k:
-            # Only top-k TMR predictions are evaluated by CLIP
-            #
-            # threshold:
-            # Remove boxes with low CLIP similarity
-            #
-            # negative_prompt:
-            # Optional negative semantic guidance
-            # Debug BEFORE CLIP
-            before_clip_info = self._prediction_debug_info(
-                pred_logits=pred_logits,
-                pred_boxes=pred_boxes,
-                ref_points=ref_points,
-                image=image,
-                batch=batch,
-                stage=stage,
-                location="before_clip"
-            )
-            self._write_clip_debug_json(before_clip_info)
-
-
-            if self.clip_reranker is not None and stage in ['val', 'test']:
-
-                pred_logits, pred_boxes, ref_points = apply_clip_reranking(
-                    pred_logits,
-                    pred_boxes,
-                    ref_points,
-                    image,
-                    self.args.text_prompt,
-                    self.clip_reranker,
-                    negative_prompt=self.args.negative_prompt,
-                    alpha=self.args.clip_alpha,
-                    beta=self.args.clip_beta,
-                    top_k=self.args.clip_topk,
-                    threshold=self.args.clip_threshold
-                )
-
-            # Debug AFTER CLIP
-            after_clip_info = self._prediction_debug_info(
-                    pred_logits=pred_logits,
-                    pred_boxes=pred_boxes,
-                    ref_points=ref_points,
-                    image=image,
-                    batch=batch,
-                    stage=stage,
-                    location="after_clip"
-                )
-            self._write_clip_debug_json(after_clip_info)
-
             # Non-Maximum Suppression (NMS)
             #
             # Removes duplicate overlapping bounding boxes
@@ -520,8 +280,6 @@ class Matching_Trainer(LightningModule):
             # Keeps boxes with highest confidence score
             # Removes lower-scoring overlapping boxes
             #
-            # Since CLIP modified the scores BEFORE this step,
-            # CLIP can influence which boxes survive NMS
             pred_logits, pred_boxes, ref_points = NMS(
                 pred_logits,
                 pred_boxes,
