@@ -35,7 +35,10 @@ def config_parser():
     # training setting
     parser.add_argument('--resume', action='store_true', help='Flag for resume')
     parser.add_argument("--max_epochs", default=30, type=int)
+    parser.add_argument("--finetune_from", type=str, default=None)
     parser.add_argument('--multi_gpu', action='store_true', help='Flag to use multi_gpu')
+    parser.add_argument("--finetune_decoders_and_heads_only", action="store_true")
+    
 
     # optimizer setting
     parser.add_argument('--weight_decay', default=1e-4, type=float)
@@ -145,12 +148,18 @@ def main(args):
             trainer.test(model=Model, datamodule=Datamodule)
     # Train mode
     else:
-        if args.resume:
+        if args.finetune_from is not None:
+            M_checkpoint = args.finetune_from
+            Model = Matching_Trainer.load_from_checkpoint(M_checkpoint,args=args,datamodule=Datamodule,strict=False)
+            trainer.fit(model=Model,datamodule=Datamodule,ckpt_path=None)
+
+        elif args.resume:
             M_checkpoint = Checkpoint_callback.lastmodelpath
-            Model = Matching_Trainer.load_from_checkpoint(M_checkpoint, args=args, datamodule=Datamodule, strict=True)
-            trainer.fit(model=Model, datamodule=Datamodule, ckpt_path=M_checkpoint)
+            Model = Matching_Trainer.load_from_checkpoint(M_checkpoint,args=args,datamodule=Datamodule,strict=True)
+            trainer.fit(model=Model,datamodule=Datamodule,ckpt_path=M_checkpoint)
+        
         else:
-            trainer.fit(model=Model, datamodule=Datamodule, ckpt_path= None)
+            trainer.fit(model=Model,datamodule=Datamodule,ckpt_path=None)
 
 if __name__ == "__main__":
     args = config_parser()

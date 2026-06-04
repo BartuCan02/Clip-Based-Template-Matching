@@ -21,6 +21,29 @@ class Matching_Trainer(LightningModule):
         self.args = args
 
         self.model = build_model(args)
+
+        if self.args.finetune_decoders_and_heads_only:
+            print("Fine-tuning only decoders and heads")
+
+            for name, param in self.model.named_parameters():
+                param.requires_grad = False
+
+            trainable_keywords = [
+                "decoder_o",
+                "decoder_b",
+                "objectness_head",
+                "ltrbs_head",
+            ]
+
+            for name, param in self.model.named_parameters():
+                if any(k in name for k in trainable_keywords):
+                    param.requires_grad = True
+
+            print("Trainable parameters:")
+            for name, param in self.model.named_parameters():
+                if param.requires_grad:
+                    print(name)
+
         self.criterion = build_criterion(args)
         self.datamodule = datamodule
         
