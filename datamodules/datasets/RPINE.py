@@ -159,4 +159,21 @@ class RPINE_Dataset(Dataset):
         return ret
     
 
+"""
+batch = {
+    "image": Tensor[B, 3, 1024, 1024],
+
+    "boxes": List[Tensor[N_i, 4]],
+    "exemplars": List[Tensor[E_i, 4]],
+
+    "label": List[str],
+
+    "img_name": List[str],
+    "img_url": List[str],
+    "img_id": List[int],
+    "img_size": List[array],
+    "orig_boxes": List[array[N_i, 4]],
+    "orig_exemplars": List[array[E_i, 4]],
+}
+"""
 
