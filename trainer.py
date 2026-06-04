@@ -23,7 +23,7 @@ class Matching_Trainer(LightningModule):
         self.model = build_model(args)
         self.criterion = build_criterion(args)
         self.datamodule = datamodule
-
+        
         self.GT_map_generator = GT_map(args)
 
         self.AP_term = args.AP_term
@@ -47,6 +47,8 @@ class Matching_Trainer(LightningModule):
 
 
         self.naclip = None
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
         if self.args.use_naclip_heatmap:
             self.naclip = NACLIPHeatmap(
                 clip_path="ViT-B/16",
@@ -140,7 +142,6 @@ class Matching_Trainer(LightningModule):
 
     def each_step(self, batch, stage):
 
-
         image = batch["image"]
         
         # Ground-truth bounding boxes of ALL target objects in the image
@@ -151,17 +152,18 @@ class Matching_Trainer(LightningModule):
         # These define WHAT pattern/object TMR should search for
         exemplars = batch["exemplars"]
 
-        
-        # Labels of bounding boxes
-        label = batch["label"][0]
-        class_names = ["background", label]
+        # Call Naclip if use_naclip_heatmap
+        naclip_heatmap = None
+        if self.args.use_naclip_heatmap:
+            label = batch["label"][0]
+            class_names = ["background", label]
 
-        naclip_heatmap = self.naclip.target_heatmap(
-            image,
-            class_names=class_names,
-            target_idx=1,
-            out_size=None
-        )
+            naclip_heatmap = self.naclip.target_heatmap(
+                image,
+                class_names=class_names,
+                target_idx=1,
+                out_size=None
+            )
 
         # Ablation settings for different regression experiments
         # a: disable learned box regression completely
