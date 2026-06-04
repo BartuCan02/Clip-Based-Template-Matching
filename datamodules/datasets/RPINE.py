@@ -17,6 +17,9 @@ class RPINE_Dataset(Dataset):
         self.split = split
         self.label_path = os.path.join(data_path, 'labels')
         self.image_path = os.path.join(data_path, 'images')
+        self.class_labels_path = os.path.join(os.path.dirname(os.path.dirname(data_path)),"class_labels.json")
+        with open(self.class_labels_path, "r") as f:
+            self.class_labels = json.load(f)
         self.exemplars_path = os.path.join(data_path, 'exemplars.json')
         self.max_exemplars = max_exemplars
         self.scale_factor = scale_factor
@@ -98,6 +101,13 @@ class RPINE_Dataset(Dataset):
 
         # get img_name, img_url
         img_name = os.path.basename(label_file).split('.')[0]
+        
+        json_split = self.split
+        if json_split == "test":
+            json_split = "val"
+        json_key = f"{json_split}/{img_name}"
+        class_label = self.class_labels[json_key]
+        
         img_url = self.img_url_finder(img_name)
         
         # image, boxes, exemplars
@@ -135,6 +145,7 @@ class RPINE_Dataset(Dataset):
 
         ret = {
             "image": image,
+            "label": class_label,
             "boxes": scaled_boxes,
             "exemplars": scaled_exemplars,
 
@@ -147,3 +158,5 @@ class RPINE_Dataset(Dataset):
         }
         return ret
     
+
+
