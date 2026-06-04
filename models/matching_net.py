@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from .template_matching import TemplateMatching
 from .regression_head import Decoder_model, ObjectnessHead, BboxesHead
 from .encoders import build_encoder
-from .naclip_wrapper import NaclipHeatmap
+from .naclip_wrapper import NACLIPHeatmap
 
 # Concatenates naclip heatmapper with the tmr's feature map and tmr's heatmap
 

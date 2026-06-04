@@ -1,3 +1,4 @@
+export PYTHONPATH="/home/zhox/NACLIP:$PYTHONPATH"
 CUDA_VISIBLE_DEVICES=0 python main.py \
 --project_name "RPINE-CLIP-TMR" \
 --datapath /home/zhox/Clip-Based-Template-Matching/data/RPINE \
@@ -6,7 +7,7 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
 --template_type roi_align \
 --dataset RPINE \
 --num_workers 4 \
---max_epochs 10 \
+--max_epochs 1 \
 --batch_size 1 \
 --num_exemplars 1 \
 --backbone sam \

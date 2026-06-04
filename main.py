@@ -150,7 +150,30 @@ def main(args):
     else:
         if args.finetune_from is not None:
             M_checkpoint = args.finetune_from
-            Model = Matching_Trainer.load_from_checkpoint(M_checkpoint,args=args,datamodule=Datamodule,strict=False)
+
+            ckpt = torch.load(M_checkpoint, map_location="cpu")
+            state_dict = ckpt["state_dict"]
+
+            model_state = Model.state_dict()
+
+            filtered_state_dict = {}
+            skipped = []
+
+            for k, v in state_dict.items():
+                if k in model_state and model_state[k].shape == v.shape:
+                    filtered_state_dict[k] = v
+                else:
+                    skipped.append((k, tuple(v.shape), tuple(model_state[k].shape) if k in model_state else None))
+
+            print("Skipped checkpoint keys due to shape mismatch / missing:")
+            for item in skipped:
+                print(item)
+
+            missing, unexpected = Model.load_state_dict(filtered_state_dict, strict=False)
+
+            print("Missing keys:", missing)
+            print("Unexpected keys:", unexpected)
+
             trainer.fit(model=Model,datamodule=Datamodule,ckpt_path=None)
 
         elif args.resume:
