@@ -51,7 +51,7 @@ __pycache__/
 # Naclip
 utils/NACLIP
 
-# Dataset search and analysis 
+# Dataset search and analysis
 sku/
 datasets/
 

@@ -93,6 +93,38 @@ wget -O weights/TMR_RPINE/best_model.ckpt https://huggingface.co/ChipmunkG4/TMR_
 python demo.py --ckpt ./weights/TMR_FSCD147/best_model.ckpt
 ```
 
+## NaCLIP Heatmap Demo
+
+<p align="center">
+    <img src="assets/new_clip_tmr_overview.png">
+</p>
+
+Visualise NaCLIP patch-level similarity for any image and text prompt — no model weights required.
+
+**Install minimal dependencies** (Python 3.11 recommended; tested with PyTorch 2.4.0):
+
+```bash
+pip install torch torchvision numpy matplotlib Pillow git+https://github.com/openai/CLIP.git
+```
+
+**Run:**
+
+```bash
+python demos/naclip_demo.py --image demo/5.jpg --text "a picture of an egg"
+python demos/naclip_demo.py --image demo/5.jpg --text "a picture of an egg" --save out.png
+```
+
+| Argument | Default | Description |
+|---|---|---|
+| `--image` | *(required)* | Path to input image |
+| `--text` | *(required)* | Target class to localise |
+| `--background` | `"background"` | Background class for two-class softmax |
+| `--logit_scale` | `40` | Softmax temperature (matches NACLIP paper) |
+| `--sigma` | `5.0` | Gaussian kernel std for attention bias (patch units) |
+| `--save` | *(none)* | Optional path to save the figure |
+
+The demo shows the input image, patch probabilities (14×14), a heatmap overlay, and the top-5 matching patches.
+
 ## Training and Testing
 ### Training
 Please change the `--datapath` argument to your own path where you have stored the dataset.
