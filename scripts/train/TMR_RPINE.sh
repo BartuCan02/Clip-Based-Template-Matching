@@ -1,7 +1,8 @@
+export PYTHONPATH="/home/zhox/NACLIP:$PYTHONPATH"
 CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py \
---project_name "Few-Shot Pattern Detection" \
---datapath /home/eunchan/datasets/RPINE \
---logpath ./outputs/TMR_RPINE \
+--project_name "RPINE-CLIP-TMR" \
+--datapath /home/zhox/Clip-Based-Template-Matching/data/RPINE \
+--logpath ./weights/TMR_RPINE_baseline_trainval \
 --modeltype matching_net \
 --template_type roi_align \
 --dataset RPINE \
@@ -24,4 +25,4 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py \
 --lr_backbone 0 \
 --lr_drop \
 --visualize \
---multi_gpu
+#--multi_gpu
