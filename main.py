@@ -38,7 +38,6 @@ def config_parser():
     parser.add_argument("--finetune_from", type=str, default=None)
     parser.add_argument('--multi_gpu', action='store_true', help='Flag to use multi_gpu')
     parser.add_argument("--finetune_decoders_and_heads_only", action="store_true")
-    
 
     # optimizer setting
     parser.add_argument('--weight_decay', default=1e-4, type=float)
@@ -49,6 +48,10 @@ def config_parser():
 
     # test setting
     parser.add_argument('--eval', action='store_true', help='Flag for evaluation')
+
+    # multimodal setting
+    parser.add_argument("--input_mode",type=str,default="box_and_text",choices=["box_only", "text_only", "box_and_text"],help="Which modalities to use when modality dropout is disabled.")
+    parser.add_argument("--use_modality_dropout",action="store_true",help="Randomly train with box_only, text_only, and box_and_text.")
 
     # visualization setting
     parser.add_argument('--visualize', action='store_true', help='Flag to store visual outputs')

@@ -23,7 +23,7 @@ class Matching_Trainer(LightningModule):
         self.model = build_model(args)
 
         if self.args.finetune_decoders_and_heads_only:
-            print("Fine-tuning only decoders")
+            print("Fine-tuning decoders and heads")
 
             for name, param in self.model.named_parameters():
                 param.requires_grad = False
@@ -31,6 +31,10 @@ class Matching_Trainer(LightningModule):
             trainable_keywords = [
                 "decoder_o",
                 "decoder_b",
+                "objectness_head",
+                "ltrbs_head",
+                "no_box_token",
+                "no_text_token",
             ]
 
             for name, param in self.model.named_parameters():
@@ -173,18 +177,38 @@ class Matching_Trainer(LightningModule):
         # These define WHAT pattern/object TMR should search for
         exemplars = batch["exemplars"]
 
-        # Call Naclip if use_naclip_heatmap
-        naclip_heatmap = None
-        if self.args.use_naclip_heatmap:
-            label = batch["label"][0]
-            class_names = ["background", label]
+        if stage == "train" and self.args.use_modality_dropout:
+            r = torch.rand(1).item()
 
-            naclip_heatmap = self.naclip.target_heatmap(
-                image,
-                class_names=class_names,
-                target_idx=1,
-                out_size=None
-            )
+            if r < 1/3:
+                use_box = True
+                use_text = True
+            elif r < 2/3:
+                use_box = True
+                use_text = False
+            else:
+                use_box = False
+                use_text = True
+        else:
+            use_box = self.args.input_mode in ["box_only", "box_and_text"]
+            use_text = self.args.input_mode in ["text_only", "box_and_text"]
+
+
+        naclip_heatmap = None
+
+        if self.args.use_naclip_heatmap and use_text:
+            heatmaps = []
+
+            for i, label in enumerate(batch["label"]):
+                heatmap_i = self.naclip.target_heatmap(
+                    image[i:i+1],
+                    class_names=["background", label],
+                    target_idx=1,
+                    out_size=None
+                )
+                heatmaps.append(heatmap_i)
+
+            naclip_heatmap = torch.cat(heatmaps, dim=0).to(image.device)
 
         # Ablation settings for different regression experiments
         # a: disable learned box regression completely
@@ -213,7 +237,7 @@ class Matching_Trainer(LightningModule):
         #
         # _:
 
-        pred_objectness, pred_regressions, matching_feature, _ = self.model(image,exemplars,naclip_heatmap=naclip_heatmap)
+        pred_objectness, pred_regressions, matching_feature, _ = self.model(image,exemplars,naclip_heatmap=naclip_heatmap,use_box=use_box,use_text=use_text)
 
         # Convert predictions + GT boxes into loss-compatible format
         #

@@ -19,6 +19,8 @@ class matching_net(nn.Module):
         self.box_reg = not args.ablation_no_box_regression
         self.encoder = build_encoder(args)(backbone, args.emb_dim)
         self.decoder_model = Decoder_model
+        self.no_box_token = nn.Parameter(torch.zeros(1, self.emb_dim, 1, 1))
+        self.no_text_token = nn.Parameter(torch.zeros(1, 1, 1, 1))
 
         self.feature_upsample = args.feature_upsample
 
@@ -52,7 +54,7 @@ class matching_net(nn.Module):
         self.objectness_head = ObjectnessHead(self.decoder_o.out_channels)
         self.ltrbs_head = BboxesHead(self.decoder_b.out_channels) if self.box_reg else None
 
-    def forward(self, sample, exemplars, naclip_heatmap= None, **kwargs):
+    def forward(self,sample,exemplars=None,naclip_heatmap=None,use_box=True,use_text=True):
         """
         Forward pass of TMR.
 
@@ -116,7 +118,9 @@ class matching_net(nn.Module):
 
             # 5. Compute template matching feature.
             # f_TM: [B, 512, H, W]
-            if self.matcher is None:
+            if not use_box:
+                f_TM = self.no_box_token.expand(fp.shape[0],self.emb_dim,fp.shape[-2],fp.shape[-1])
+            elif self.matcher is None:
                 f_TM = fp
             else:
                 f_TM = self.matcher(fp, exemplars)
@@ -136,22 +140,25 @@ class matching_net(nn.Module):
             # If fusion=True:  f_cat = [fp, f_TM, naclip_heatmap]
             # If fusion=False: f_cat = [f_TM, naclip_heatmap]
             
-            if naclip_heatmap is not None:
-                naclip_heatmap = naclip_heatmap.to(f_cat.device)
-                
-                
-                # Ensures the heatmap spatial resolution matches f_cat. (ToDo: If this line is unncessary remove it aftet the dataset test) 
-                if naclip_heatmap.shape[-2:] != f_cat.shape[-2:]:
-                    naclip_heatmap = F.interpolate(
-                        naclip_heatmap,
+            if use_text and naclip_heatmap is not None:
+                text_feature = naclip_heatmap.to(f_cat.device)
+
+                if text_feature.shape[-2:] != f_cat.shape[-2:]:
+                    text_feature = F.interpolate(
+                        text_feature,
                         size=f_cat.shape[-2:],
                         mode="bilinear",
                         align_corners=False
                     )
-                # f_cat:
-                # [B, 1025, H, W]
-                f_cat = torch.cat([f_cat, naclip_heatmap], dim=1)
-
+            else:
+                text_feature = self.no_text_token.expand(
+                    f_cat.shape[0],
+                    1,
+                    f_cat.shape[-2],
+                    f_cat.shape[-1]
+                )
+            f_cat = torch.cat([f_cat, text_feature], dim=1)
+            
             # 8. Box regression branch.
             # b: [B, 4, H, W]
             if self.box_reg:
