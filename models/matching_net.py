@@ -7,7 +7,7 @@ from .regression_head import Decoder_model, ObjectnessHead, BboxesHead
 from .encoders import build_encoder
 from .naclip_wrapper import NACLIPHeatmap
 
-# Concatenates naclip heatmapper with the tmr's feature map and tmr's heatmap
+
 
 class matching_net(nn.Module):
     def __init__(self, backbone, args):
@@ -135,6 +135,7 @@ class matching_net(nn.Module):
                 f_cat = torch.cat([fp, f_TM], dim=1)
             else:
                 f_cat = f_TM
+
             
             # 7. Concatenate the NaCLIP heatmap to f_cat.
             # If fusion=True:  f_cat = [fp, f_TM, naclip_heatmap]

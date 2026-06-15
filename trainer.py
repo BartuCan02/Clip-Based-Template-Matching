@@ -193,7 +193,6 @@ class Matching_Trainer(LightningModule):
             use_box = self.args.input_mode in ["box_only", "box_and_text"]
             use_text = self.args.input_mode in ["text_only", "box_and_text"]
 
-
         naclip_heatmap = None
 
         if self.args.use_naclip_heatmap and use_text:
