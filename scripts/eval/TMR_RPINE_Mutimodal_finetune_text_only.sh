@@ -2,13 +2,12 @@ export PYTHONPATH="/home/zhox/NACLIP:$PYTHONPATH"
 CUDA_VISIBLE_DEVICES=0 python main.py \
 --project_name "RPINE-CLIP-TMR" \
 --datapath /home/zhox/Clip-Based-Template-Matching/data/RPINE \
---logpath ./weights/TMR_RPINE_Multimodal_finetune_decoder_heads_and_learnable_parameters_50_epoch \
+--logpath ./weights/TMR_RPINE_Multimodal_finetune_decoder_heads_and_learnable_parameters_50_epoch_text_only_eval \
 --modeltype matching_net \
 --template_type roi_align \
 --dataset RPINE \
---num_workers 4 \
---max_epochs 50 \
---batch_size 8 \
+--num_workers 1 \
+--batch_size 1 \
 --num_exemplars 1 \
 --backbone sam \
 --encoder original \
@@ -22,12 +21,7 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
 --NMS_iou_threshold 0.5 \
 --fusion \
 --use_naclip_heatmap \
---finetune_decoders_and_heads_only \
---finetune_from /home/zhox/Clip-Based-Template-Matching/weights/TMR_RPINE_baseline/best_model.ckpt \
---lr 1e-4 \
---lr_backbone 0 \
---lr_drop \
 --visualize \
---input_mode box_and_text \
---use_modality_dropout \
-
+--eval \
+--input_mode text_only \
+#--nowandb
