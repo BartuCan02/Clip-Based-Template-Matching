@@ -12,7 +12,7 @@ Official implementation of "Few-Shot Pattern Detection via Template Matching and
 [[Project Page]](https://chipmunk-g4.github.io/TMR/)
 [[Paper]](https://arxiv.org/abs/2508.17636)
 [[Dataset]](https://huggingface.co/datasets/ChipmunkG4/RPINE)
-[[Model weights]](https://img.shields.io/badge/Checkpoint-Orange)
+[[Model weights]](https://huggingface.co/ChipmunkG4/TMR_weights)
 
 <a href="https://arxiv.org/abs/2508.17636"><img src="https://img.shields.io/badge/arXiv-2508.17636-b31b1b" alt="arXiv"></a>
 <!-- <a href="https://huggingface.co/ChipmunkG4/TMR_weights" target="_blank"><img src="https://img.shields.io/badge/Checkpoint-Orange" alt="checkpoint"></a> -->
@@ -111,7 +111,17 @@ Template-Matching-And-Regression/
 Download the pre-trained model weights from this [link](https://huggingface.co/ChipmunkG4/TMR_weights) and place them in the `weights` folder.
 
 ```
+mkdir -p weights/TMR_RPINE
 wget -O weights/TMR_RPINE/best_model.ckpt https://huggingface.co/ChipmunkG4/TMR_weights/resolve/main/TMR_RPINE/best_model.ckpt
+```
+
+The text-conditioned scripts fine-tune from this checkpoint via
+`$TMR_BASELINE_CKPT`, which defaults to `weights/TMR_RPINE_baseline/best_model.ckpt`.
+If you use the published checkpoint above rather than one you trained yourself,
+point the variable at it:
+
+```bash
+export TMR_BASELINE_CKPT=weights/TMR_RPINE/best_model.ckpt
 ```
 
 ## Demo
