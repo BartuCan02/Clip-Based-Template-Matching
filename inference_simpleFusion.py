@@ -59,6 +59,12 @@ def config_parser():
     parser.add_argument("--score-threshold", default=0.5, type=float)
     parser.add_argument("--nms-iou-threshold", default=0.5, type=float)
     parser.add_argument("--device", default=None)
+    parser.add_argument(
+        "--log-stats",
+        action="store_true",
+        help="Print per-layer f_cat means before/after modulation (the statistics "
+             "behind the report's Approach 2 distribution-shift analysis).",
+    )
 
     return parser.parse_args()
 
@@ -363,6 +369,7 @@ def main(args):
             image_tensor,
             exemplars,
             naclip_map=naclip_fusion_map,
+            log_stats=args.log_stats,
         )
 
         pred_boxes, pred_scores = postprocess(

@@ -134,6 +134,26 @@ class Matching_Trainer(LightningModule):
             self.AP_log = False
 
     def each_step_multi_exemplars(self, batch, stage):
+        """Eval-only variant of each_step for multiple exemplars per image.
+
+        Selected in __init__ (it replaces self.each_step) when --num_exemplars > 1
+        together with --eval. Each exemplar is run through the model separately
+        and the per-exemplar predictions are concatenated before box refinement,
+        CLIP re-ranking and NMS, so the exemplars compete in a single NMS pass
+        rather than producing independent detection sets. Requires batch_size 1.
+
+        The text path is not exercised here: this variant predates the 1025-channel
+        work and calls the model without a naclip_heatmap, so the 1025th channel
+        always falls back to the learned no_text_token placeholder. Use each_step
+        for anything text-conditioned.
+
+        Args:
+            batch: dict with "image", "boxes" and "exemplars".
+            stage: one of 'train', 'val', 'test'; gates re-ranking and logging.
+
+        Returns:
+            dict with the summed loss under 'loss'.
+        """
         image = batch["image"]
         gt_boxes = batch['boxes']
         multi_exemplars = batch["exemplars"]
@@ -196,9 +216,39 @@ class Matching_Trainer(LightningModule):
 
 
     def each_step(self, batch, stage):
+        """Main train/val/test step: the Approach 3 (1025-channel) path.
 
+        Decides the query mode, builds the NaCLIP heatmap for it, runs TMR,
+        computes losses, and on val/test decodes boxes and logs them.
+
+        Query mode. During training with --use_modality_dropout, each sample
+        draws uniformly over box_and_text / box_only / text_only, which is what
+        lets one checkpoint serve all three modes at eval. Otherwise the mode is
+        fixed by --input_mode. use_box / use_text are passed to the model, which
+        substitutes its learned no_box_token / no_text_token placeholder for
+        whichever modality is absent, so the head always sees a complete
+        1025-channel tensor.
+
+        Text conditioning. When --use_naclip_heatmap is set and text is in play,
+        the per-sample label from batch["label"] is turned into a dense
+        [B, 1, H, W] heatmap by a two-class softmax against "background". The
+        heatmap is built per sample in a loop, so this scales linearly with
+        batch size and dominates step time.
+
+        Note the asymmetry: use_text=False skips NaCLIP entirely, but
+        --use_naclip_heatmap=False also skips it even in a text mode, in which
+        case text_only degenerates to the placeholder alone.
+
+        Args:
+            batch: dict with "image", "boxes", "exemplars" and "label".
+            stage: one of 'train', 'val', 'test'. Only val/test decode boxes,
+                run CLIP re-ranking and NMS, and write image logs.
+
+        Returns:
+            dict with the summed loss under 'loss'.
+        """
         image = batch["image"]
-        
+
         # Ground-truth bounding boxes of ALL target objects in the image
         # Used for supervision/loss computation
         gt_boxes = batch['boxes']

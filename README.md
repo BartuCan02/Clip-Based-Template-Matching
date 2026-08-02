@@ -268,7 +268,9 @@ Relevant flags: `--use_clip`, `--text_prompt`, `--negative_prompt`, `--clip_mode
 `models/matching_net_simpleFusion.py` over `models/matching_net.py`):
 
 ```bash
-python inference_simpleFusion.py
+python inference_simpleFusion.py            # add --log-stats for the per-layer
+                                            # f_cat statistics behind the report's
+                                            # distribution-shift analysis
 ```
 
 ## Citation

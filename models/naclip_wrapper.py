@@ -6,6 +6,33 @@ from prompts.imagenet_template import openai_imagenet_template
 
 class NACLIPHeatmap:
     def __init__(self,clip_path="ViT-B/16",device="cuda",arch="reduced",attn_strategy="naclip",gaussian_std=5.0,logit_scale=40,):
+        """Wrap a CLIP ViT with NaCLIP's dense-prediction attention.
+
+        Turns a class name into the dense [B, 1, H, W] probability map M used as
+        the 1025th channel. Inference only: the CLIP weights are frozen and every
+        forward runs under no_grad.
+
+        Args:
+            clip_path: CLIP variant. ViT-B/16 gives a 14x14 patch grid at 224px,
+                which is the resolution the heatmap is produced at before being
+                bilinearly resized to the TMR feature map.
+            device: torch device string.
+            arch: NaCLIP architecture mode, 'reduced' or 'vanilla'. 'reduced'
+                drops the FFN and residual in the last block, which is what makes
+                patch tokens locally meaningful instead of globally pooled.
+            attn_strategy: NaCLIP attention. 'naclip' applies the Gaussian
+                neighbourhood attention bias.
+            gaussian_std: std of that neighbourhood prior, in patch units. 5.0 is
+                NaCLIP's default and the value reported in the paper; it is what
+                makes the map usable at all, since plain CLIP patch tokens give a
+                map dominated by high-frequency noise and outlier patches. Must be
+                > 0 when attn_strategy is 'naclip'.
+            logit_scale: temperature for the two-class softmax against the
+                "background" prompt. Higher values sharpen M towards 0/1, lower
+                values flatten it. 40 is the value used for all reported results;
+                it was not ablated, so treat it as a tuning knob rather than a
+                justified optimum.
+        """
         self.device = device
         self.net, self.preprocess = clip.load(
             clip_path,
