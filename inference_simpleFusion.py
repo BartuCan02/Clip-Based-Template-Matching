@@ -1,14 +1,15 @@
-"""Standalone inference for Approach 2 (training-free multiplicative modulation).
+"""
+Standalone inference for Approach 2, the multiplicative modulation variant.
 
 Runs a frozen TMR checkpoint with the NaCLIP heatmap gating the fused feature and
-writes an annotated image. See models/matching_net_simpleFusion.py for the method
-and why it is a negative result.
+writes out an annotated image. See models/matching_net_simpleFusion.py for the
+method itself and why it ends up a negative result.
 
-Setup:
-  1. Copy models/matching_net_simpleFusion.py over models/matching_net.py. It
-     defines the same `matching_net` class, and build_model() imports that path.
-  2. pip install -r requirements.txt
-  3. git submodule update --init   (supplies third_party/naclip)
+Before running:
+1. copy models/matching_net_simpleFusion.py over models/matching_net.py, it
+   defines the same `matching_net` class and build_model() imports that path
+2. pip install -r requirements.txt
+3. git submodule update --init, for third_party/naclip
 
 Example:
   python inference_simpleFusion.py \
@@ -18,8 +19,8 @@ Example:
     --exemplar-box 100 100 200 200 \
     --output outputs/simple_fusion_demo.jpg
 
-Add --log-stats for the per-layer f_cat statistics behind the report's
-distribution-shift analysis.
+--log-stats adds the per-layer f_cat numbers behind the distribution-shift
+analysis in the report.
 """
 
 

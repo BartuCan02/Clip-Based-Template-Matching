@@ -11,17 +11,18 @@ from PIL import Image
 
 
 def _import_openai_clip():
-    """Import the pip-installed OpenAI CLIP, bypassing NaCLIP's shadowing copy.
+    """
+    Import the pip-installed OpenAI CLIP, bypassing NaCLIP's shadowing copy.
 
     The text-conditioned scripts put third_party/naclip on PYTHONPATH so that
-    `import clip` resolves to NaCLIP's patched fork, which is what supplies the
-    visual.set_params() API that models/naclip_wrapper.py needs. That fork's
-    VisionTransformer.forward refuses to run until set_params() has been called,
-    so re-ranking against it fails. Re-ranking wants plain CLIP.
+    `import clip` picks up NaCLIP's fork, which is what supplies the
+    visual.set_params() API naclip_wrapper needs. That fork refuses to run its
+    VisionTransformer.forward until set_params() has been called, so re-ranking
+    against it dies. Re-ranking wants plain CLIP.
 
-    Import the genuine package with the NaCLIP entries dropped from sys.path,
-    then restore the module table so the heatmap path keeps its fork. Both
-    approaches can therefore run in one process.
+    So import the real package with the NaCLIP entries dropped from sys.path,
+    then put the module table back the way it was, leaving the heatmap path its
+    fork. That way both approaches survive in one process.
     """
     saved_path = list(sys.path)
     saved_modules = {k: v for k, v in sys.modules.items()

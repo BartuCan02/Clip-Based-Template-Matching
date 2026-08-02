@@ -1,30 +1,27 @@
-"""Approach 2: training-free multiplicative modulation of the TMR feature map.
+"""
+Approach 2, training-free multiplicative modulation of the TMR feature map.
 
-This is the report's Approach 2 (Eq. 1, "multiplicative heatmap modulation"). It
-gates the fused feature with a dense NaCLIP text-similarity heatmap M:
+Gates the fused feature with the dense NaCLIP text-similarity heatmap M:
 
-    F_cat <- F_cat * (1 + gamma * M),    gamma = GAMMA = 2
+    F_cat <- F_cat * (1 + gamma * M),    gamma = 2
 
-The intent is a soft spatial attention: locations NaCLIP considers consistent
-with the prompt get their matching response amplified by up to 3x, others are
-left unchanged. It needs no training, preserves the channel count, and reduces
-to the identity when M == 0, so it can be dropped onto a frozen, pre-trained
-TMR checkpoint.
+The idea is a soft spatial attention. Locations NaCLIP thinks match the prompt
+get their response amplified by up to 3x, the rest stay as they are. No training
+needed, channel count unchanged, and it is the identity when M == 0, so it drops
+straight onto a frozen TMR checkpoint.
 
-This is a NEGATIVE RESULT and is kept for reproducibility, not for use. It
-degrades detections. The reason is a distribution shift the head was never
-trained for: the pre-trained decoders expect F_cat at a particular scale, and a
-spatially varying gain in [1, 3] acts on a linear-plus-sigmoid presence head as
-a spatially varying temperature rather than as attention, making the score map
-more confident wherever the prompt matches regardless of the correlation
-evidence. It is also applied to all 1024 channels, including the projected
-image feature, so it corrupts the appearance pathway as well as the matching
-one. Approach 3 (models/matching_net.py) supersedes it by concatenating M as a
-1025th channel and re-training the head instead.
+It does not work, and is kept here only so the result can be reproduced. The
+problem is a distribution shift the head was never trained for. The decoders
+expect F_cat at a particular scale, and a spatially varying gain in [1, 3] hits
+a linear-plus-sigmoid presence head as a varying temperature rather than as
+attention, so the score map turns confident wherever the prompt matches whether
+or not the correlation evidence is there. It also hits all 1024 channels, the
+projected image feature included, so the appearance pathway is corrupted along
+with the matching one. matching_net.py supersedes this by concatenating M as a
+1025th channel and re-training the head.
 
-This module is a drop-in replacement for models/matching_net.py: it defines the
-same `matching_net` class, so copy it over that file before running
-inference_simpleFusion.py.
+Drop-in replacement for models/matching_net.py, same `matching_net` class, so
+copy it over that file before running inference_simpleFusion.py.
 """
 
 import torch
@@ -77,22 +74,19 @@ class matching_net(nn.Module):
         self.ltrbs_head = BboxesHead(self.decoder_b.out_channels) if self.box_reg else None
 
     def forward(self, sample, exemplars, naclip_map=None, log_stats=False, **kwargs):
-        """Run TMR, modulating the fused feature by the NaCLIP heatmap.
+        """
+        Run TMR, modulating the fused feature by the NaCLIP heatmap.
 
-        Args:
-            sample: input image batch, [B, 3, H, W].
-            exemplars: support exemplar box(es) defining the pattern to find.
-            naclip_map: dense NaCLIP text-similarity heatmap M, broadcastable to
-                f_cat's spatial size, values in [0, 1]. When None, no modulation
-                is applied and this reduces to plain TMR.
-            log_stats: print per-layer f_cat means before and after modulation.
-                These are the statistics reported in the paper's Approach 2
-                analysis (f_cat means rising by roughly 2x on prompt-consistent
-                images); off by default because it prints on every forward pass.
+        naclip_map is the dense text-similarity map, broadcastable to f_cat's
+        spatial size with values in [0, 1]. Pass None to skip modulation, which
+        reduces this to plain TMR.
 
-        Returns:
-            (os, bs, f_TMs, f[0]): objectness maps, box regression maps,
-            template-matching features, and the first backbone feature level.
+        log_stats prints the per-layer f_cat means before and after modulation.
+        Those are the numbers behind the report's distribution-shift analysis,
+        off by default because they fire on every forward pass.
+
+        Returns (os, bs, f_TMs, f[0]): objectness maps, box regression maps,
+        template-matching features and the first backbone level.
         """
         f = self.encoder(sample)
         if not isinstance(f, list):
