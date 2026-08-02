@@ -33,6 +33,15 @@ Install python dependencies:
 pip install -r requirements.txt
 ```
 
+The NaCLIP source is vendored as a git submodule under `third_party/naclip`, and
+`models/backbone/clip/naclip_vit.py` loads it from there. Clone with it, or fetch
+it after the fact:
+```
+git clone --recurse-submodules https://github.com/BartuCan02/Clip-Based-Template-Matching.git
+# or, in an existing clone:
+git submodule update --init
+```
+
 #### * Data preparation
 You can download **FSCD-147** and **FSCD-LVIS** datasets from the [Counting-DETR](https://github.com/VinAIResearch/Counting-DETR) repository.
 
