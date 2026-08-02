@@ -13,6 +13,7 @@ from utils.TM_utils import Get_pred_boxes, GT_map, NMS
 from utils.box_refine import SAM_box_refiner
 from utils.log_utils import image_info_collector, Get_AP_scores, coco_style_annotation_generator, del_img_log_path, Get_MAE_RMSE
 from models.naclip_wrapper import NACLIPHeatmap
+from utils.clip_utils import CLIPReranker, apply_clip_reranking
 
 class Matching_Trainer(LightningModule):
     def __init__(self, args, datamodule):
@@ -83,6 +84,24 @@ class Matching_Trainer(LightningModule):
                 gaussian_std=5.0,
                 logit_scale=40,
             )
+
+        # CLIP semantic re-ranking (approach 1), eval only
+        self.clip_reranker = None
+        if self.args.use_clip:
+            if self.args.eval and self.args.text_prompt is not None:
+                try:
+                    self.clip_reranker = CLIPReranker(model_name=self.args.clip_model, device=device)
+                    print(f"CLIP reranker initialized with model: {self.args.clip_model}")
+                    print(f"Positive prompt: '{self.args.text_prompt}'")
+                    if self.args.negative_prompt:
+                        print(f"Negative prompt: '{self.args.negative_prompt}'")
+                except Exception as e:
+                    print(f"Failed to initialize CLIP reranker: {e}")
+                    self.clip_reranker = None
+            elif not self.args.eval:
+                print("CLIP reranking is only available in evaluation mode.")
+            elif self.args.text_prompt is None:
+                print("Text prompt is required for CLIP reranking. Use --text_prompt argument.")
 
 
     def training_step(self, batch, batch_idx):
@@ -157,8 +176,19 @@ class Matching_Trainer(LightningModule):
         if self.args.refine_box:
             backbone_feature = self.temp_sam(image)
             pred_logits, pred_boxes, ref_points = self.refiner(pred_logits, pred_boxes, ref_points, image, backbone_feature)
-        
-        
+
+        # Apply CLIP re-ranking before NMS
+        if self.clip_reranker is not None and stage in ['val', 'test']:
+            pred_logits, pred_boxes, ref_points = apply_clip_reranking(
+                pred_logits, pred_boxes, ref_points, image,
+                self.args.text_prompt, self.clip_reranker,
+                negative_prompt=self.args.negative_prompt,
+                alpha=self.args.clip_alpha,
+                beta=self.args.clip_beta,
+                top_k=self.args.clip_topk,
+                threshold=self.args.clip_threshold
+            )
+
         pred_logits, pred_boxes, ref_points = NMS(pred_logits, pred_boxes, ref_points, self.args.NMS_iou_threshold)
         image_info_collector(self.args.logpath, stage, batch, pred_logits, pred_boxes, ref_points)
 
@@ -317,6 +347,22 @@ class Matching_Trainer(LightningModule):
                     ref_points,
                     image,
                     backbone_feature
+                )
+
+            # Apply CLIP re-ranking before NMS
+            if self.clip_reranker is not None and stage in ['val', 'test']:
+                pred_logits, pred_boxes, ref_points = apply_clip_reranking(
+                    pred_logits,
+                    pred_boxes,
+                    ref_points,
+                    image,
+                    self.args.text_prompt,
+                    self.clip_reranker,
+                    negative_prompt=self.args.negative_prompt,
+                    alpha=self.args.clip_alpha,
+                    beta=self.args.clip_beta,
+                    top_k=self.args.clip_topk,
+                    threshold=self.args.clip_threshold
                 )
 
             # Non-Maximum Suppression (NMS)

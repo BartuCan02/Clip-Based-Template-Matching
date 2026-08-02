@@ -163,13 +163,18 @@ the companion repo `nlp-report` under `report/`.
 
 ### Where to find what
 
-The three approaches we compared live on different branches.
+All three approaches we compared are in this tree.
 
-| Approach | Branch | Key files |
-|---|---|---|
-| 3. **1025-channel fusion** (main result): NaCLIP heatmap concatenated as an extra channel, learnable placeholders, modality dropout | `main` | [`models/matching_net.py`](models/matching_net.py), [`models/naclip_wrapper.py`](models/naclip_wrapper.py), [`trainer.py`](trainer.py) |
-| 1. **CLIP semantic re-ranking** (eval-time score fusion, supports negative prompts) | `feat(naclip)--implement-naclip-backbone` | `utils/clip_utils.py`, `trainer.py`, `scripts/eval/examples_clip_reranking.sh` |
-| 2. **Simple multiplicative fusion** (`F_cat * (1 + 2M)`, training-free) | `naclip-simple-fusion` | `models/matching_net_simpleFusion.py`, `inference_simpleFusion.py` |
+| Approach | Key files |
+|---|---|
+| 1. **CLIP semantic re-ranking** (eval-time score fusion, supports negative prompts) | [`utils/clip_utils.py`](utils/clip_utils.py), [`trainer.py`](trainer.py), [`scripts/eval/examples_clip_reranking.sh`](scripts/eval/examples_clip_reranking.sh) |
+| 2. **Simple multiplicative fusion** (`F_cat * (1 + 2M)`, training-free) | [`models/matching_net_simpleFusion.py`](models/matching_net_simpleFusion.py), [`inference_simpleFusion.py`](inference_simpleFusion.py) |
+| 3. **1025-channel fusion** (main result): NaCLIP heatmap concatenated as an extra channel, learnable placeholders, modality dropout | [`models/matching_net.py`](models/matching_net.py), [`models/naclip_wrapper.py`](models/naclip_wrapper.py), [`trainer.py`](trainer.py) |
+
+Approach 3 is what the default code path runs. Approach 1 is off unless you pass
+`--use_clip`. Approach 2 is a standalone variant: `models/matching_net_simpleFusion.py`
+is a drop-in replacement for `models/matching_net.py` (same `matching_net` class),
+so copy it over that file before running `inference_simpleFusion.py`.
 
 Other things worth knowing:
 
@@ -183,10 +188,10 @@ Other things worth knowing:
   the `test` split reads the `val` keys.
 - [`datamodules/datasets/RPINE.py`](datamodules/datasets/RPINE.py) attaches the label to each batch
   under `"label"`, which `trainer.py` feeds to NaCLIP.
-- Validation visualisations from the fine-tuning runs are committed on `bartu/decoder_finetuning`
-  under `image_visualize_val/`.
+- Validation visualisations are not committed (they are ~170 MB of JPEGs). Regenerate
+  them by passing `--visualize` to any eval script; they land in `image_visualize_*/`.
 
-### Extra setup for the text branch
+### Extra setup for the text path
 
 NaCLIP must be importable, and the OpenAI CLIP package is required:
 
@@ -242,7 +247,7 @@ The relevant flags in `main.py` are:
 | `--finetune_from` | Checkpoint to initialise from (shape-mismatched decoders are re-initialised) |
 | `--visualize` | Write per-image GT/prediction overlays to `image_visualize_*/` |
 
-**Approach 1, CLIP re-ranking** (branch `feat(naclip)--implement-naclip-backbone`, eval only):
+**Approach 1, CLIP re-ranking** (eval only, needs `--use_clip` and `--text_prompt`):
 
 ```bash
 sh scripts/eval/examples_clip_reranking.sh   # prints ready-to-copy commands
@@ -250,7 +255,8 @@ sh scripts/eval/examples_clip_reranking.sh   # prints ready-to-copy commands
 Relevant flags: `--use_clip`, `--text_prompt`, `--negative_prompt`, `--clip_model`,
 `--clip_alpha`, `--clip_beta`, `--clip_topk`, `--clip_threshold`.
 
-**Approach 2, simple fusion** (branch `naclip-simple-fusion`):
+**Approach 2, simple fusion** (training-free; first copy
+`models/matching_net_simpleFusion.py` over `models/matching_net.py`):
 
 ```bash
 python inference_simpleFusion.py
