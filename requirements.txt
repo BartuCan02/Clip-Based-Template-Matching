@@ -8,6 +8,9 @@ matplotlib==3.9.2
 numpy==1.26.3
 opencv-python-headless==4.10.0.84
 Pillow>=9.0.0
+# NaCLIP's clip/clip.py does `from pkg_resources import packaging`, which needs
+# setuptools; pkg_resources is removed in setuptools 81+.
+setuptools<81
 pycocotools==2.0.8
 segment-anything==1.0
 torch==2.4.0

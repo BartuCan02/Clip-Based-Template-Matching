@@ -243,6 +243,13 @@ which is what provides the `visual.set_params(...)` API that
 OpenAI CLIP (for the weights and tokenizer) and the submodule supplies the
 patched attention.
 
+Approach 1 needs the opposite: NaCLIP's `VisionTransformer.forward` refuses to
+run until `set_params()` has been called, so re-ranking cannot use the fork.
+`utils/clip_utils.py` handles this by importing the genuine OpenAI CLIP with the
+NaCLIP entries removed from `sys.path`, then restoring the module table. Both
+approaches therefore work in one process and `--use_clip` is safe to combine
+with `--use_naclip_heatmap`.
+
 The scripts below assume the TMR RPINE baseline checkpoint sits at
 `weights/TMR_RPINE_baseline/best_model.ckpt` (see *Model weights* above); the
 text-conditioned models are fine-tuned from it.

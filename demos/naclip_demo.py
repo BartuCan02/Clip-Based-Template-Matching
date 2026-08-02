@@ -75,7 +75,13 @@ def main(args):
     clip_model, _ = openai_clip.load("ViT-B/16", device=device)
     clip_model.eval()
 
-    text_emb = encode_text_ensemble(clip_model, args.text, device)       # [1, 512]
+    # Two embeddings, target and background, so the demo reproduces the
+    # two-class softmax that NACLIPHeatmap.target_heatmap uses. A raw cosine
+    # map is not comparable across prompts and occupies a narrow band around
+    # 0.2-0.3, which is why this is normalised rather than plotted directly.
+    text_emb = encode_text_ensemble(clip_model, args.text, device)         # [1, 512]
+    bg_emb   = encode_text_ensemble(clip_model, "background", device)      # [1, 512]
+    both_emb = torch.cat([bg_emb, text_emb], dim=0)                        # [2, 512]
 
     pil = Image.open(args.image).convert("RGB")
     x   = backbone.clip_preprocess(pil).unsqueeze(0).to(device)
@@ -87,8 +93,11 @@ def main(args):
         pf = patch_feats.flatten(2).permute(0, 2, 1)   # [1, 196, 512]
         pf = F.normalize(pf, dim=-1)
 
-        # Raw cosine similarity between each patch and the text embedding
-        sim = (pf @ text_emb.T).reshape(1, 1, H, W)    # [1, 1, 14, 14]
+        # [1, 196, 2] cosine logits, then softmax over the two classes at
+        # logit_scale, matching models/naclip_wrapper.py. Index 1 is the target.
+        logits = (pf @ both_emb.T).reshape(1, H, W, 2).permute(0, 3, 1, 2)
+        probs  = torch.softmax(logits * args.logit_scale, dim=1)
+        sim    = probs[:, 1:2]                          # [1, 1, 14, 14]
 
         prob14  = sim[0, 0].cpu().numpy()               # [14, 14]
         prob224 = F.interpolate(
@@ -97,7 +106,9 @@ def main(args):
 
     img224 = pil.resize((224, 224))
     fig, axes = plt.subplots(1, 4, figsize=(18, 4))
-    fig.suptitle(f'Prompt: "{args.text}"  |  raw cosine similarity', fontsize=13)
+    fig.suptitle(
+        f'Prompt: "{args.text}"  |  two-class softmax vs "background" '
+        f'(logit_scale={args.logit_scale:g})', fontsize=13)
 
     axes[0].imshow(img224)
     axes[0].set_title("Input image")

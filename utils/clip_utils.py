@@ -3,10 +3,43 @@ CLIP-based semantic reranking utilities for TMR few-shot pattern detection.
 """
 
 import os
+import sys
 import torch
 import torch.nn.functional as F
 import numpy as np
 from PIL import Image
+
+
+def _import_openai_clip():
+    """Import the pip-installed OpenAI CLIP, bypassing NaCLIP's shadowing copy.
+
+    The text-conditioned scripts put third_party/naclip on PYTHONPATH so that
+    `import clip` resolves to NaCLIP's patched fork, which is what supplies the
+    visual.set_params() API that models/naclip_wrapper.py needs. That fork's
+    VisionTransformer.forward refuses to run until set_params() has been called,
+    so re-ranking against it fails. Re-ranking wants plain CLIP.
+
+    Import the genuine package with the NaCLIP entries dropped from sys.path,
+    then restore the module table so the heatmap path keeps its fork. Both
+    approaches can therefore run in one process.
+    """
+    saved_path = list(sys.path)
+    saved_modules = {k: v for k, v in sys.modules.items()
+                     if k == "clip" or k.startswith("clip.")}
+    try:
+        sys.path = [p for p in sys.path if "naclip" not in p.lower()]
+        for k in list(saved_modules):
+            del sys.modules[k]
+        import clip as openai_clip
+        if not hasattr(openai_clip, "load"):
+            raise ImportError("resolved 'clip' has no load()")
+        return openai_clip
+    finally:
+        sys.path = saved_path
+        for k in [k for k in sys.modules
+                  if k == "clip" or k.startswith("clip.")]:
+            del sys.modules[k]
+        sys.modules.update(saved_modules)
 
 
 class CLIPReranker:
@@ -19,8 +52,7 @@ class CLIPReranker:
         self.text_embeddings = {}
 
         try:
-            import clip
-            self.clip = clip
+            self.clip = _import_openai_clip()
         except ImportError:
             raise ImportError(
                 "OpenAI CLIP is required. Install with:\n"
