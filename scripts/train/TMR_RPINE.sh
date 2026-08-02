@@ -1,7 +1,7 @@
-export PYTHONPATH="/home/zhox/NACLIP:$PYTHONPATH"
+export PYTHONPATH="${NACLIP_PATH:-third_party/naclip}:$PYTHONPATH"
 CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py \
 --project_name "RPINE-CLIP-TMR" \
---datapath /home/zhox/Clip-Based-Template-Matching/data/RPINE \
+--datapath "${RPINE_DATA:-data/RPINE}" \
 --logpath ./weights/TMR_RPINE_baseline_trainval \
 --modeltype matching_net \
 --template_type roi_align \

@@ -25,7 +25,7 @@ def config_parser():
     parser.add_argument('--best_model_count', action='store_true', help='Flag to save best model using counting metric (MAE)')
 
     # dataset setting
-    parser.add_argument('--datapath', type=str, default='/home/', help='Dataset path')
+    parser.add_argument('--datapath', type=str, default='data/RPINE', help='Dataset root. The scripts in scripts/ pass this explicitly via $RPINE_DATA / $FSC147_DATA / $FSCD_LVIS_DATA.')
     parser.add_argument('--dataset', type=str, default='RPINE', help='Dataset type, e.g., RPINE, FSCD147')
     parser.add_argument("--batch_size", default=1, type=int)
     parser.add_argument("--num_workers", default=8, type=int)

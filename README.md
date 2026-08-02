@@ -48,7 +48,25 @@ You can download **FSCD-147** and **FSCD-LVIS** datasets from the [Counting-DETR
 You can download **RPINE** dataset form this [link](https://huggingface.co/datasets/ChipmunkG4/RPINE).
 
 ```
-git clone https://huggingface.co/datasets/ChipmunkG4/RPINE
+git clone https://huggingface.co/datasets/ChipmunkG4/RPINE data/RPINE
+```
+
+#### * Paths used by the scripts
+
+The scripts in `scripts/` take their paths from environment variables with
+repo-relative defaults, so they run unmodified from the repository root. Override
+any of them if your data lives elsewhere:
+
+| Variable | Default | Used for |
+|---|---|---|
+| `RPINE_DATA` | `data/RPINE` | RPINE dataset root |
+| `FSC147_DATA` | `data/FSC147` | FSC-147 dataset root |
+| `FSCD_LVIS_DATA` | `data/FSCD_LVIS` | FSCD-LVIS dataset root |
+| `TMR_BASELINE_CKPT` | `weights/TMR_RPINE_baseline/best_model.ckpt` | checkpoint the text models fine-tune from |
+| `NACLIP_PATH` | `third_party/naclip` | NaCLIP checkout put on `PYTHONPATH` |
+
+```bash
+RPINE_DATA=/mnt/datasets/RPINE sh scripts/train/TMR_RPINE.sh
 ```
 
 #### * Backbone weights preparation
@@ -202,12 +220,18 @@ Other things worth knowing:
 
 ### Extra setup for the text path
 
-NaCLIP must be importable, and the OpenAI CLIP package is required:
+NaCLIP must be importable. The scripts already put the vendored submodule on
+`PYTHONPATH` for you; only do this by hand if you are running `main.py` directly:
 
 ```bash
-pip install git+https://github.com/openai/CLIP.git
-export PYTHONPATH="/path/to/NACLIP:$PYTHONPATH"
+export PYTHONPATH="third_party/naclip:$PYTHONPATH"
 ```
+
+This deliberately shadows the pip-installed `clip` package with NaCLIP's fork,
+which is what provides the `visual.set_params(...)` API that
+`models/naclip_wrapper.py` calls. Both are needed: `requirements.txt` installs
+OpenAI CLIP (for the weights and tokenizer) and the submodule supplies the
+patched attention.
 
 The scripts below assume the TMR RPINE baseline checkpoint sits at
 `weights/TMR_RPINE_baseline/best_model.ckpt` (see *Model weights* above); the

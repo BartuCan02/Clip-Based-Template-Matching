@@ -1,17 +1,26 @@
-# preprocess before running this code:
-# 1. copy paste code from matching_net_simpleFusion into matching_net.py
-# 2. make sure to clone NACLIP repo, and the best_model.ckpt and sam
-# 3. run these: 
-#   !pip install ftfy regex yapf==0.40.1
-#   !pip install -r requirements.txt
-# 4. example usage in colab:
-#   !python inference_simpleFusion.py \
-#  --image /content/drive/MyDrive/nlp-prac/Template-Matching-and-Regression/demo/5.jpg \
-#  --ckpt /content/drive/MyDrive/nlp-prac/Template-Matching-and-Regression/weights/TMR_RPINE/best_model.ckpt \
-#  --naclip-repo /content/drive/MyDrive/nlp-prac//NACLIP \
-#  --target egg \
-#  --exemplar-box 100 100 200 200 \
-#  --output outputs/simple_fusion_demo.jpg
+"""Standalone inference for Approach 2 (training-free multiplicative modulation).
+
+Runs a frozen TMR checkpoint with the NaCLIP heatmap gating the fused feature and
+writes an annotated image. See models/matching_net_simpleFusion.py for the method
+and why it is a negative result.
+
+Setup:
+  1. Copy models/matching_net_simpleFusion.py over models/matching_net.py. It
+     defines the same `matching_net` class, and build_model() imports that path.
+  2. pip install -r requirements.txt
+  3. git submodule update --init   (supplies third_party/naclip)
+
+Example:
+  python inference_simpleFusion.py \
+    --image demo/5.jpg \
+    --ckpt weights/TMR_RPINE/best_model.ckpt \
+    --target egg \
+    --exemplar-box 100 100 200 200 \
+    --output outputs/simple_fusion_demo.jpg
+
+Add --log-stats for the per-layer f_cat statistics behind the report's
+distribution-shift analysis.
+"""
 
 
 
@@ -40,7 +49,12 @@ def config_parser():
 
     parser.add_argument("--image", required=True, help="Path to input image.")
     parser.add_argument("--ckpt", required=True, help="Path to TMR checkpoint.")
-    parser.add_argument("--naclip-repo", required=True, help="Path to cloned NACLIP repo.")
+    parser.add_argument(
+        "--naclip-repo",
+        default="third_party/naclip",
+        help="Path to the NaCLIP repo. Defaults to the vendored submodule; run "
+             "'git submodule update --init' if it is empty.",
+    )
     parser.add_argument("--target", required=True, help='Target word, e.g. "egg".')
 
     parser.add_argument(

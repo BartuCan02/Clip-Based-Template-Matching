@@ -1,6 +1,6 @@
 CUDA_VISIBLE_DEVICES=0 python main.py \
 --project_name "Few-Shot Pattern Detection" \
---datapath /home/eunchan/datasets/FSCD_LVIS \
+--datapath "${FSCD_LVIS_DATA:-data/FSCD_LVIS}" \
 --logpath ./outputs/TMR_FSCD_LVIS_unseen \
 --modeltype matching_net \
 --template_type roi_align \

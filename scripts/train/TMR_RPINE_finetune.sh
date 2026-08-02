@@ -1,7 +1,7 @@
-export PYTHONPATH="/home/zhox/NACLIP:$PYTHONPATH"
+export PYTHONPATH="${NACLIP_PATH:-third_party/naclip}:$PYTHONPATH"
 CUDA_VISIBLE_DEVICES=0 python main.py \
 --project_name "RPINE-CLIP-TMR" \
---datapath /home/zhox/Clip-Based-Template-Matching/data/RPINE \
+--datapath "${RPINE_DATA:-data/RPINE}" \
 --logpath ./weights/TMR_RPINE_finetune_decoder_and_heads_30epoch \
 --modeltype matching_net \
 --template_type roi_align \
@@ -23,7 +23,7 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
 --fusion \
 --use_naclip_heatmap \
 --finetune_decoders_and_heads_only \
---finetune_from /home/zhox/Clip-Based-Template-Matching/weights/TMR_RPINE_baseline/best_model.ckpt \
+--finetune_from "${TMR_BASELINE_CKPT:-weights/TMR_RPINE_baseline/best_model.ckpt}" \
 --lr 1e-4 \
 --lr_backbone 0 \
 --lr_drop \
