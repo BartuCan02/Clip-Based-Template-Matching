@@ -153,6 +153,109 @@ sh scripts/eval/TMR_FSCD_LVIS_Unseen.sh
 You can check the descriptions of all arguments used in the scripts by referring to `main.py`.
 
 
+## NLP Practical Project: text-conditioned TMR
+
+This fork extends TMR so that detection can be driven by a **text prompt**, an
+**exemplar box**, or **both**. The report for the project (ACL format) lives in
+the companion repo `nlp-report` under `report/`.
+
+**Team:** Bartu Can, Kilian Haas, Xiaohan Zhong. **Supervisor:** Frederic Mrozinski.
+
+### Where to find what
+
+The three approaches we compared live on different branches.
+
+| Approach | Branch | Key files |
+|---|---|---|
+| 3. **1025-channel fusion** (main result): NaCLIP heatmap concatenated as an extra channel, learnable placeholders, modality dropout | `main` | [`models/matching_net.py`](models/matching_net.py), [`models/naclip_wrapper.py`](models/naclip_wrapper.py), [`trainer.py`](trainer.py) |
+| 1. **CLIP semantic re-ranking** (eval-time score fusion, supports negative prompts) | `feat(naclip)--implement-naclip-backbone` | `utils/clip_utils.py`, `trainer.py`, `scripts/eval/examples_clip_reranking.sh` |
+| 2. **Simple multiplicative fusion** (`F_cat * (1 + 2M)`, training-free) | `naclip-simple-fusion` | `models/matching_net_simpleFusion.py`, `inference_simpleFusion.py` |
+
+Other things worth knowing:
+
+- [`models/backbone/clip/naclip_vit.py`](models/backbone/clip/naclip_vit.py) is the NaCLIP ViT (Gaussian
+  neighbourhood attention bias, no FFN/residual in the last block).
+- [`models/naclip_wrapper.py`](models/naclip_wrapper.py) turns a class name into a dense
+  `[B, 1, H, W]` probability heatmap (80-template prompt ensembling, two-class softmax vs. `"background"`).
+- [`data/class_labels.json`](data/class_labels.json) holds the **manually corrected** RPINE text labels;
+  [`data/class_labels_pre_annotated.json`](data/class_labels_pre_annotated.json) holds the raw
+  GPT-generated ones. 618 of 4,360 entries (14.2%) differ. Keys are `"{split}/{img_name}"`;
+  the `test` split reads the `val` keys.
+- [`datamodules/datasets/RPINE.py`](datamodules/datasets/RPINE.py) attaches the label to each batch
+  under `"label"`, which `trainer.py` feeds to NaCLIP.
+- Validation visualisations from the fine-tuning runs are committed on `bartu/decoder_finetuning`
+  under `image_visualize_val/`.
+
+### Extra setup for the text branch
+
+NaCLIP must be importable, and the OpenAI CLIP package is required:
+
+```bash
+pip install git+https://github.com/openai/CLIP.git
+export PYTHONPATH="/path/to/NACLIP:$PYTHONPATH"
+```
+
+The scripts below assume the TMR RPINE baseline checkpoint sits at
+`weights/TMR_RPINE_baseline/best_model.ckpt` (see *Model weights* above); the
+text-conditioned models are fine-tuned from it.
+
+### Running our experiments
+
+Baseline (no text), for reference:
+
+```bash
+sh scripts/train/TMR_RPINE.sh
+sh scripts/eval/TMR_RPINE.sh
+```
+
+**Approach 3, multimodal fine-tuning** (uniform 1/3 modality dropout, decoders +
+heads + placeholders trainable, backbone frozen). Set `--max_epochs` to 30/50/100/150
+to reproduce the rows of the results table:
+
+```bash
+sh scripts/train/TMR_RPINE_Multimodal_finetune.sh
+```
+
+**Approach 3, single-mode fine-tuning** (text always present, no modality dropout).
+This is the 35.47 AP row:
+
+```bash
+sh scripts/train/TMR_RPINE_finetune.sh
+```
+
+Evaluate one checkpoint in each of the three query modes:
+
+```bash
+sh scripts/eval/TMR_RPINE_Mutimodal_finetune_box_only.sh
+sh scripts/eval/TMR_RPINE_Mutimodal_finetune_text_only.sh
+sh scripts/eval/TMR_RPINE_Mutimodal_finetune_box_and_text.sh
+```
+
+The relevant flags in `main.py` are:
+
+| Flag | Meaning |
+|---|---|
+| `--use_naclip_heatmap` | Enable the 1025th (NaCLIP) channel |
+| `--use_modality_dropout` | Randomly pick box_only / text_only / box_and_text per training sample |
+| `--input_mode` | Fixed query mode at eval: `box_only`, `text_only`, `box_and_text` |
+| `--finetune_decoders_and_heads_only` | Freeze everything except decoders, heads and the two placeholders |
+| `--finetune_from` | Checkpoint to initialise from (shape-mismatched decoders are re-initialised) |
+| `--visualize` | Write per-image GT/prediction overlays to `image_visualize_*/` |
+
+**Approach 1, CLIP re-ranking** (branch `feat(naclip)--implement-naclip-backbone`, eval only):
+
+```bash
+sh scripts/eval/examples_clip_reranking.sh   # prints ready-to-copy commands
+```
+Relevant flags: `--use_clip`, `--text_prompt`, `--negative_prompt`, `--clip_model`,
+`--clip_alpha`, `--clip_beta`, `--clip_topk`, `--clip_threshold`.
+
+**Approach 2, simple fusion** (branch `naclip-simple-fusion`):
+
+```bash
+python inference_simpleFusion.py
+```
+
 ## Citation
 
 If you find this work useful for your research, please cite our paper:
