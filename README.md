@@ -271,12 +271,17 @@ sh scripts/eval/TMR_RPINE.sh
 ```
 
 **Approach 3, multimodal fine-tuning** (uniform 1/3 modality dropout, decoders +
-heads + placeholders trainable, backbone frozen). Set `--max_epochs` to 30/50/100/150
-to reproduce the rows of the results table:
+heads + placeholders trainable, backbone frozen). As shipped, the script trains the
+150-epoch row into `weights/TMR_RPINE_Multimodal_finetune_150epoch`:
 
 ```bash
 sh scripts/train/TMR_RPINE_Multimodal_finetune.sh
 ```
+
+For the other rows of the results table, change **both** `--max_epochs` (to 30/50/100)
+and `--logpath` to match: training asserts that `--logpath` does not already exist, so
+each row needs its own directory. Point `$TMR_MULTIMODAL_CKPT` at that directory's
+`best_model.ckpt` when evaluating it.
 
 **Approach 3, single-mode fine-tuning** (text always present, no modality dropout).
 This is the 35.47 AP row:
