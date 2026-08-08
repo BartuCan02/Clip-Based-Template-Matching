@@ -32,7 +32,7 @@ wandb/
 *.pth
 
 # Data
-RPINE/
+/data/RPINE/
 
 # HuggingFace cache
 .cache/
@@ -52,12 +52,17 @@ __pycache__/
 utils/NACLIP
 
 # Dataset search and analysis
-sku/
-datasets/
+/sku/
+/datasets/
 
 # Weights
-weights/
+/weights/
 
 # Outputs folder
-outputs/
+/outputs/
 
+
+# Eval/visualization outputs (regenerate with --visualize)
+image_visualize_*/
+PR_visualize_*/
+logged_datas/

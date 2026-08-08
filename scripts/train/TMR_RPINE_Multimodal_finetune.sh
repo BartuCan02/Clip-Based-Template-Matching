@@ -2,13 +2,13 @@ export PYTHONPATH="${NACLIP_PATH:-third_party/naclip}:$PYTHONPATH"
 CUDA_VISIBLE_DEVICES=0 python main.py \
 --project_name "RPINE-CLIP-TMR" \
 --datapath "${RPINE_DATA:-data/RPINE}" \
---logpath ./weights/TMR_RPINE_Multimodal_finetune_decoder_heads_and_learnable_parameters_50_epoch \
+--logpath ./weights/TMR_RPINE_Multimodal_finetune_150epoch \
 --modeltype matching_net \
 --template_type roi_align \
 --dataset RPINE \
 --num_workers 4 \
---max_epochs 50 \
---batch_size 8 \
+--max_epochs 150 \
+--batch_size 4 \
 --num_exemplars 1 \
 --backbone sam \
 --encoder original \
@@ -29,5 +29,4 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
 --lr_drop \
 --visualize \
 --input_mode box_and_text \
---use_modality_dropout \
-
+--use_modality_dropout

@@ -1,8 +1,17 @@
 export PYTHONPATH="${NACLIP_PATH:-third_party/naclip}:$PYTHONPATH"
+
+# Baseline (no text): the flags below must match scripts/train/TMR_RPINE.sh, so
+# no --use_naclip_heatmap here -- the baseline decoder takes 1024 channels, not
+# 1025, and strict checkpoint loading fails if the two disagree.
+CKPT="${TMR_BASELINE_CKPT:-weights/TMR_RPINE_baseline/best_model.ckpt}"
+LOGPATH=./weights/TMR_RPINE_baseline_eval
+mkdir -p "$LOGPATH"
+cp -n "$CKPT" "$LOGPATH/best_model.ckpt"
+
 CUDA_VISIBLE_DEVICES=0 python main.py \
 --project_name "RPINE-CLIP-TMR" \
 --datapath "${RPINE_DATA:-data/RPINE}" \
---logpath ./weights/TMR_RPINE_finetune_decoder_and_heads_10epoch \
+--logpath "$LOGPATH" \
 --modeltype matching_net \
 --template_type roi_align \
 --dataset RPINE \
@@ -20,7 +29,5 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
 --NMS_cls_threshold 0.1 \
 --NMS_iou_threshold 0.5 \
 --fusion \
---use_naclip_heatmap \
 --visualize \
---eval \
-#--nowandb
+--eval

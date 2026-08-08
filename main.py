@@ -131,7 +131,9 @@ def main(args):
         accelerator="auto",
         strategy="ddp" if args.multi_gpu else "auto",
         devices=-1 if args.multi_gpu else 1 if torch.cuda.is_available() else torch.cpu.device_count(),
-        logger=CSVLogger(save_dir=args.logpath) if args.nowandb else WandbLogger(name=run_name,entity="nlp-project-tum", save_dir=args.logpath, project=project_name),
+        # WANDB_ENTITY defaults to None, i.e. the entity of whoever is logged in.
+        # Our runs used entity="nlp-project-tum"; pass --nowandb to log to CSV instead.
+        logger=CSVLogger(save_dir=args.logpath) if args.nowandb else WandbLogger(name=run_name,entity=os.environ.get("WANDB_ENTITY"), save_dir=args.logpath, project=project_name),
         callbacks=callbacks,
         num_sanity_val_steps=0,
         gradient_clip_val=args.clip_max_norm,

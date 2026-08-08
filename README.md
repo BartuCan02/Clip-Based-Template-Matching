@@ -62,8 +62,11 @@ any of them if your data lives elsewhere:
 | `RPINE_DATA` | `data/RPINE` | RPINE dataset root |
 | `FSC147_DATA` | `data/FSC147` | FSC-147 dataset root |
 | `FSCD_LVIS_DATA` | `data/FSCD_LVIS` | FSCD-LVIS dataset root |
-| `TMR_BASELINE_CKPT` | `weights/TMR_RPINE_baseline/best_model.ckpt` | checkpoint the text models fine-tune from |
+| `TMR_BASELINE_CKPT` | `weights/TMR_RPINE_baseline/best_model.ckpt` | checkpoint the text models fine-tune from, and the one `scripts/eval/TMR_RPINE.sh` evaluates |
+| `TMR_MULTIMODAL_CKPT` | `weights/TMR_RPINE_Multimodal_finetune_150epoch/best_model.ckpt` | checkpoint the three `..._Mutimodal_finetune_*` eval scripts evaluate |
+| `TMR_FINETUNE_CKPT` | `weights/TMR_RPINE_finetune_decoder_and_heads_30epoch/best_model.ckpt` | checkpoint `scripts/eval/TMR_RPINE_finetune_decoder_and_head.sh` evaluates |
 | `NACLIP_PATH` | `third_party/naclip` | NaCLIP checkout put on `PYTHONPATH` |
+| `WANDB_ENTITY` | *(your default entity)* | W&B team to log to. Our runs used `nlp-project-tum`; pass `--nowandb` to log to CSV instead |
 
 ```bash
 RPINE_DATA=/mnt/datasets/RPINE sh scripts/train/TMR_RPINE.sh
@@ -176,7 +179,11 @@ sh scripts/train/TMR_FSCD_LVIS_Unseen.sh
 For detailed argument descriptions, please refer to `main.py`.
 
 ### Testing
-To evaluate the pre-trained weights only, create a folder and copy the weight checkpoint into it, then change the `--logpath` argument to that folder's directory.
+`main.py` loads the checkpoint to evaluate by listing `--logpath`, so an eval run's
+output directory must already contain the checkpoint. The RPINE eval scripts do this
+staging step for you (they `mkdir` the output directory and copy the checkpoint named
+by the `*_CKPT` variables above into it). For the FSCD-147 / FSCD-LVIS scripts, create
+the folder and copy the checkpoint in yourself, then point `--logpath` at it.
 
 You can add the `--refine_box` argument to evaluate with the SAM decoder box refinement setting.
 

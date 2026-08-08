@@ -18,6 +18,11 @@ class RPINE_Dataset(Dataset):
         self.label_path = os.path.join(data_path, 'labels')
         self.image_path = os.path.join(data_path, 'images')
         self.class_labels_path = os.path.join(os.path.dirname(os.path.dirname(data_path)),"class_labels.json")
+        if not os.path.exists(self.class_labels_path):
+            # class_labels.json ships with the repo rather than with the dataset,
+            # so fall back to it when $RPINE_DATA points outside the repo.
+            repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            self.class_labels_path = os.path.join(repo_root, "data", "class_labels.json")
         with open(self.class_labels_path, "r") as f:
             self.class_labels = json.load(f)
         self.exemplars_path = os.path.join(data_path, 'exemplars.json')

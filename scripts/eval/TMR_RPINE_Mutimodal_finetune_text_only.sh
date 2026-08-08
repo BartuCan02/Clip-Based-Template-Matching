@@ -1,8 +1,17 @@
 export PYTHONPATH="${NACLIP_PATH:-third_party/naclip}:$PYTHONPATH"
+
+# main.py loads the checkpoint by listing --logpath, so stage it into this run's
+# output directory first. Point $TMR_MULTIMODAL_CKPT at your own checkpoint if it
+# does not live in the default training logpath.
+CKPT="${TMR_MULTIMODAL_CKPT:-weights/TMR_RPINE_Multimodal_finetune_150epoch/best_model.ckpt}"
+LOGPATH=./weights/TMR_RPINE_Multimodal_finetune_150epoch_text_only_eval
+mkdir -p "$LOGPATH"
+cp -n "$CKPT" "$LOGPATH/best_model.ckpt"
+
 CUDA_VISIBLE_DEVICES=0 python main.py \
 --project_name "RPINE-CLIP-TMR" \
 --datapath "${RPINE_DATA:-data/RPINE}" \
---logpath ./weights/TMR_RPINE_Multimodal_finetune_decoder_heads_and_learnable_parameters_50_epoch_text_only_eval \
+--logpath "$LOGPATH" \
 --modeltype matching_net \
 --template_type roi_align \
 --dataset RPINE \
@@ -23,5 +32,4 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
 --use_naclip_heatmap \
 --visualize \
 --eval \
---input_mode text_only \
-#--nowandb
+--input_mode text_only
