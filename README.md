@@ -207,15 +207,17 @@ the companion repo `nlp-report` under `report/`.
 
 ### Where to find what
 
-All three approaches we compared are in this tree.
+The report compares four approaches. Three of them are implemented in this tree;
+the numbering below is the report's, so the two documents can be read side by side.
 
 | Approach | Key files |
 |---|---|
 | 1. **CLIP semantic re-ranking** (eval-time score fusion, supports negative prompts) | [`utils/clip_utils.py`](utils/clip_utils.py), [`trainer.py`](trainer.py), [`scripts/eval/examples_clip_reranking.sh`](scripts/eval/examples_clip_reranking.sh) |
 | 2. **Simple multiplicative fusion** (`F_cat * (1 + 2M)`, training-free) | [`models/matching_net_simpleFusion.py`](models/matching_net_simpleFusion.py), [`inference_simpleFusion.py`](inference_simpleFusion.py) |
-| 3. **1025-channel fusion** (main result): NaCLIP heatmap concatenated as an extra channel, learnable placeholders, modality dropout | [`models/matching_net.py`](models/matching_net.py), [`models/naclip_wrapper.py`](models/naclip_wrapper.py), [`trainer.py`](trainer.py) |
+| 3. **1x1 convolutional adapter** (preliminary, abandoned before a full benchmark run) | *not implemented in this tree* |
+| 4. **1025-channel fusion** (main result): NaCLIP heatmap concatenated as an extra channel, learnable placeholders, modality dropout | [`models/matching_net.py`](models/matching_net.py), [`models/naclip_wrapper.py`](models/naclip_wrapper.py), [`trainer.py`](trainer.py) |
 
-Approach 3 is what the default code path runs. Approach 1 is off unless you pass
+Approach 4 is what the default code path runs. Approach 1 is off unless you pass
 `--use_clip`. Approach 2 is a standalone variant: `models/matching_net_simpleFusion.py`
 is a drop-in replacement for `models/matching_net.py` (same `matching_net` class),
 so copy it over that file before running `inference_simpleFusion.py`.
@@ -270,7 +272,7 @@ sh scripts/train/TMR_RPINE.sh
 sh scripts/eval/TMR_RPINE.sh
 ```
 
-**Approach 3, multimodal fine-tuning** (uniform 1/3 modality dropout, decoders +
+**Approach 4, multimodal fine-tuning** (uniform 1/3 modality dropout, decoders +
 heads + placeholders trainable, backbone frozen). As shipped, the script trains the
 150-epoch row into `weights/TMR_RPINE_Multimodal_finetune_150epoch`:
 
@@ -283,7 +285,7 @@ and `--logpath` to match: training asserts that `--logpath` does not already exi
 each row needs its own directory. Point `$TMR_MULTIMODAL_CKPT` at that directory's
 `best_model.ckpt` when evaluating it.
 
-**Approach 3, single-mode fine-tuning** (text always present, no modality dropout).
+**Approach 4, single-mode fine-tuning** (text always present, no modality dropout).
 This is the 35.47 AP row:
 
 ```bash
