@@ -8,7 +8,7 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
 --dataset RPINE \
 --num_workers 4 \
 --max_epochs 30 \
---batch_size 1 \
+--batch_size 4 \
 --num_exemplars 1 \
 --backbone sam \
 --encoder original \
